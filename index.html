@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Twice</title>
-  <meta name="google-site-verification" content="TE4WVE_vZDf5tAG49L61s-MAFWGBfCeu1IEhQgGIh74" />
+<meta name="google-site-verification" content="TE4WVE_vZDf5tAG49L61s-MAFWGBfCeu1IEhQgGIh74" />
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -206,6 +206,7 @@ h3.sec{margin:26px 0 10px}
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
 <script>
 (function(){
 'use strict';
@@ -232,7 +233,7 @@ function defaults(){
       mk('TVS Jupiter 2017, 38,000 km','Vehicles & bikes','Good',34000,'Tambaram, Chennai','Second owner, papers clear, insurance valid. Serviced in September.'),
       mk('Class 12 PCM textbook set','Books & study','Like new',600,'Mylapore, Chennai','Physics, Chemistry and Maths, both volumes. No markings.')
     ],
-    settings:{brand:'Twice',upiId:'9176683102@fam',monthly:50,yearly:150,pinHash:''}
+    settings:{brand:'Twice',upiId:'9176683102@fam',monthly:50,yearly:150,pinHash:'',razorpayKey:'',instantUpi:true}
   };
 }
 function load(){
@@ -249,7 +250,7 @@ function load(){
 var db=load();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db));return true;}catch(e){return false;}}
 
-var ui={authTab:'google',otp:null,otpPhone:'',otpName:'',plan:'yearly',payTab:'upi',tab:'',q:'',cat:'All',modal:null,
+var ui={authTab:'google',otp:null,otpPhone:'',otpName:'',plan:'yearly',payTab:(db.settings.razorpayKey?'card':'upi'),tab:'',q:'',cat:'All',modal:null,
   adminOpen:false,adminAuthed:false,adminTab:'overview',confirmId:null,confirmReset:false,photo:''};
 
 var app=document.getElementById('app'), toastEl=document.getElementById('toast'), tt=null;
@@ -264,6 +265,13 @@ function activeSub(id){
 function pendingSub(id){return db.subs.find(function(s){return s.userId===id&&s.status==='pending';});}
 function lastSub(id){return db.subs.filter(function(s){return s.userId===id;}).sort(function(a,b){return b.requestedAt-a.requestedAt;})[0];}
 function planAmt(k){return k==='yearly'?db.settings.yearly:db.settings.monthly;}
+function grantAccess(u,plan,ref,method,verified){
+  var start=Math.max(Date.now(),(activeSub(u.id)||{endAt:0}).endAt);
+  db.subs.push({id:uid(),userId:u.id,plan:plan,amount:planAmt(plan),utr:ref,method:method,verified:verified,status:'active',requestedAt:Date.now(),startAt:start,endAt:start+(plan==='yearly'?365:30)*DAY,decidedAt:Date.now()});
+  ui.tab=u.role==='seller'?'new':'browse';ui.modal=null;
+  saveRender();window.scrollTo(0,0);
+  toast('Payment done. You can '+(u.role==='seller'?'start selling':'start buying')+' now.');
+}
 function contactOf(u){return u?(u.phone?'+91 '+u.phone:u.email):'';}
 
 /* ---------- shell ---------- */
@@ -373,11 +381,17 @@ function payView(u){
         '<p class="muted small">On a phone the button opens your UPI app. If nothing happens, scan the QR or copy the ID.</p></div></div>'+
         '<form class="form" data-form="utr" style="margin-top:20px" novalidate>'+
         '<div class="field"><label for="u-utr">UPI transaction ID (12 digits)</label><input id="u-utr" name="utr" inputmode="numeric" maxlength="12" placeholder="e.g. 412345678901"><span class="hint">Find it in your payment app under transaction details, sometimes called UTR or reference number.</span></div>'+
-        '<button class="btn" type="submit">I’ve paid '+inr(amt)+'</button></form>';
+        '<button class="btn" type="submit">I’ve paid '+inr(amt)+(s.instantUpi?' · unlock now':'')+'</button></form>';
     }else{
-      pay='<div class="empty"><b>Card payments are not switched on yet</b><p style="margin-top:6px">Debit and credit card payments open once the owner connects a payment gateway. Please pay by UPI for now.</p></div>';
+      if(s.razorpayKey){
+        pay='<div class="stack" style="gap:12px"><p>Pay <b>'+inr(amt)+'</b> by card, UPI, net banking or wallet. Your access starts the moment the payment succeeds.</p>'+
+          '<button class="btn" data-act="razorpay" style="align-self:flex-start">Pay '+inr(amt)+' securely</button>'+
+          '<p class="muted small">You will see the secure Razorpay window and come back here automatically.</p></div>';
+      }else{
+        pay='<div class="empty"><b>Instant card payments are not switched on yet</b><p style="margin-top:6px">The owner needs to add a Razorpay key in Owner area, Settings. Please pay by UPI for now.</p></div>';
+      }
     }
-    body=plans+'<div class="panel flat"><div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="'+(ui.payTab==='upi')+'" data-act="payTab" data-v="upi">UPI</button><button class="tab" role="tab" aria-selected="'+(ui.payTab==='card')+'" data-act="payTab" data-v="card">Debit / credit card</button></div>'+pay+'</div>';
+    body=plans+'<div class="panel flat"><div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="'+(ui.payTab==='upi')+'" data-act="payTab" data-v="upi">Pay to UPI ID</button><button class="tab" role="tab" aria-selected="'+(ui.payTab==='card')+'" data-act="payTab" data-v="card">Card / UPI (instant)</button></div>'+pay+'</div>';
   }
   return '<section class="page"><h2>Subscribe to '+(u.role==='seller'?'sell':'buy')+' on '+esc(s.brand)+'</h2>'+
     '<p class="muted" style="margin-top:8px">One subscription covers both buying and selling.</p>'+stepper(2)+'<div style="margin-top:22px">'+notice+body+'</div></section>';
@@ -473,7 +487,7 @@ function adminView(){
       (first?'<div class="field"><label for="a-pin2">Repeat PIN</label><input id="a-pin2" name="pin2" type="password" autocomplete="new-password"></div>':'')+
       '<button class="btn" type="submit">'+(first?'Save PIN':'Unlock')+'</button></form></section>';
   }
-  var pend=db.subs.filter(function(x){return x.status==='pending';});
+  var pend=db.subs.filter(function(x){return x.status==='pending'||(x.status==='active'&&x.verified===false);});
   var total=db.subs.filter(function(x){return x.status==='active';}).reduce(function(a,x){return a+x.amount;},0);
   var members=db.users.filter(function(x){return activeSub(x.id);}).length;
   var live=db.listings.filter(function(x){return x.status==='live';}).length;
@@ -482,14 +496,14 @@ function adminView(){
   var c='';
   if(ui.adminTab==='overview'){
     c='<div class="tiles"><div class="tile"><b>'+pend.length+'</b><span class="muted small">Payments to confirm</span></div><div class="tile"><b>'+members+'</b><span class="muted small">Active members</span></div><div class="tile"><b>'+live+'</b><span class="muted small">Live listings</span></div><div class="tile"><b>'+inr(total)+'</b><span class="muted small">Approved so far</span></div></div>'+
-      '<p class="muted">Payments arrive in your UPI account <b style="color:var(--ink)">'+esc(s.upiId)+'</b>. Match each transaction ID against your bank or UPI app history, then approve it in the Payments tab.</p>';
+      '<p class="muted">Payments arrive in your UPI account <b style="color:var(--ink)">'+esc(s.upiId)+'</b>. Card and Razorpay payments unlock access automatically. For direct UPI payments, match each transaction ID with your UPI app history in the Payments tab, then press Payment received, or Remove access if it is wrong.</p>';
   }else if(ui.adminTab==='payments'){
-    var hist=db.subs.filter(function(x){return x.status!=='pending';}).sort(function(a,b){return b.requestedAt-a.requestedAt;});
+    var hist=db.subs.filter(function(x){return !(x.status==='pending'||(x.status==='active'&&x.verified===false));}).sort(function(a,b){return b.requestedAt-a.requestedAt;});
     function row(x,acts){var u=userById(x.userId);return '<tr><td>'+ftime(x.requestedAt)+'</td><td>'+esc(u?u.name:'?')+'<div class="muted small">'+esc(contactOf(u))+'</div></td><td>'+esc(x.plan)+'</td><td>'+inr(x.amount)+'</td><td><code>'+esc(x.utr)+'</code></td><td>'+acts+'</td></tr>';}
     c='<h3 class="sec" style="margin-top:0">To confirm</h3>'+(pend.length?'<div class="scroll"><table class="tbl"><thead><tr><th>Sent</th><th>Member</th><th>Plan</th><th>Amount</th><th>Transaction ID</th><th></th></tr></thead><tbody>'+
-      pend.map(function(x){return row(x,'<div class="acts"><button class="btn sm" data-act="approve" data-id="'+x.id+'">Approve</button><button class="btn danger sm" data-act="reject" data-id="'+x.id+'">Reject</button></div>');}).join('')+'</tbody></table></div>':'<div class="empty">Nothing waiting.</div>')+
+      pend.map(function(x){return row(x,x.status==='active'?'<div class="acts"><span class="pill">Access given</span><button class="btn sm" data-act="confirmUpi" data-id="'+x.id+'">Payment received</button><button class="btn danger sm" data-act="revoke" data-id="'+x.id+'">Remove access</button></div>':'<div class="acts"><button class="btn sm" data-act="approve" data-id="'+x.id+'">Approve</button><button class="btn danger sm" data-act="reject" data-id="'+x.id+'">Reject</button></div>');}).join('')+'</tbody></table></div>':'<div class="empty">Nothing waiting.</div>')+
       '<h3 class="sec">History</h3>'+(hist.length?'<div class="scroll"><table class="tbl"><thead><tr><th>Sent</th><th>Member</th><th>Plan</th><th>Amount</th><th>Transaction ID</th><th>Result</th></tr></thead><tbody>'+
-      hist.map(function(x){return row(x,x.status==='active'?'<span class="pill good">Approved till '+fdate(x.endAt)+'</span>':'<span class="pill bad">Rejected</span>');}).join('')+'</tbody></table></div>':'<div class="empty">No decisions yet.</div>');
+      hist.map(function(x){return row(x,x.status==='active'?'<span class="pill good">'+(x.method==='razorpay'?'Paid online':'Approved')+' till '+fdate(x.endAt)+'</span>':'<span class="pill bad">Rejected</span>');}).join('')+'</tbody></table></div>':'<div class="empty">No decisions yet.</div>');
   }else if(ui.adminTab==='members'){
     c=db.users.length?'<div class="scroll"><table class="tbl"><thead><tr><th>Name</th><th>Contact</th><th>Signed in with</th><th>Role</th><th>Plan</th></tr></thead><tbody>'+
       db.users.map(function(x){var a=activeSub(x.id);return '<tr><td>'+esc(x.name)+'</td><td>'+esc(contactOf(x))+'</td><td>'+(x.via==='google'?'Google':'Mobile')+'</td><td>'+esc(x.role||'Not chosen')+'</td><td>'+(a?'<span class="pill good">Till '+fdate(a.endAt)+'</span>':'<span class="pill">None</span>')+'</td></tr>';}).join('')+'</tbody></table></div>':'<div class="empty">No one has signed up yet.</div>';
@@ -500,6 +514,8 @@ function adminView(){
     c='<form class="panel form" data-form="settings" novalidate><h3>Business settings</h3>'+
       '<div class="row2"><div class="field"><label for="s-brand">Company name</label><input id="s-brand" name="brand" maxlength="24" value="'+esc(s.brand)+'"></div>'+
       '<div class="field"><label for="s-upi">UPI ID for payments</label><input id="s-upi" name="upi" value="'+esc(s.upiId)+'"></div></div>'+
+      '<div class="field"><label for="s-rzp">Razorpay Key ID (starts with rzp_)</label><input id="s-rzp" name="rzp" placeholder="rzp_live_xxxxxxxxxxxx" value="'+esc(s.razorpayKey||'')+'"><span class="hint">Paste the public Key ID only, never the secret. With this set, card, UPI and net banking payments give access instantly.</span></div>'+
+      '<div class="field"><label for="s-inst">Direct UPI payments</label><select id="s-inst" name="inst"><option value="1"'+(s.instantUpi?' selected':'')+'>Give access instantly, I confirm later</option><option value="0"'+(!s.instantUpi?' selected':'')+'>Wait for my approval</option></select></div>'+
       '<div class="row2"><div class="field"><label for="s-monthly">Monthly price (₹)</label><input id="s-monthly" name="monthly" inputmode="numeric" value="'+s.monthly+'"></div>'+
       '<div class="field"><label for="s-yearly">Yearly price (₹)</label><input id="s-yearly" name="yearly" inputmode="numeric" value="'+s.yearly+'"></div></div>'+
       '<button class="btn" type="submit" style="align-self:flex-start">Save settings</button></form>'+
@@ -507,7 +523,7 @@ function adminView(){
       '<div class="panel" style="margin-top:18px"><h3 style="margin-bottom:10px">Before real customers use this</h3><ul class="check">'+
       '<li>Host it on your own domain with a server and database. Right now each browser keeps its own data, so members, listings and payments are not shared between devices.</li>'+
       '<li>Connect real Google sign-in (a Google Cloud OAuth client ID) and an SMS OTP service. Both are simulated here.</li>'+
-      '<li>Add a payment gateway such as Razorpay or Cashfree to take cards and confirm UPI payments automatically. Direct UPI to a personal ID cannot be verified by a website, so approvals are manual for now.</li>'+
+      '<li>Razorpay is wired in: add your Key ID in Settings above. For production, also verify each payment on a server with your Razorpay secret before granting access. Direct UPI to a personal ID cannot be verified by a website, so those are confirmed by you after access is given.</li>'+
       '<li>Make the owner login server-side. The PIN here only protects this browser.</li></ul></div>'+
       '<div class="panel" style="margin-top:18px"><h3 style="margin-bottom:10px">Reset preview data</h3><p class="muted small" style="margin-bottom:12px">Clears members, payments, requests and listings in this browser and restores the sample items.</p>'+
       (ui.confirmReset?'<button class="btn danger sm" data-act="resetYes">Yes, reset everything</button> <button class="btn ghost sm" data-act="resetNo">Cancel</button>':'<button class="btn danger sm" data-act="resetAsk">Reset data</button>')+'</div>';
@@ -548,6 +564,28 @@ var A={
     catch(e){toast('Copy is not available here. Select the text and copy it.');}
   },
   refresh:function(){render();toast('Status checked');},
+  razorpay:function(){
+    var u=me(),s=db.settings,plan=ui.plan,amt=planAmt(plan);
+    if(typeof Razorpay==='undefined'){toast('Payment window could not load. Check your internet and try again.');return;}
+    try{
+      var rz=new Razorpay({
+        key:s.razorpayKey,amount:amt*100,currency:'INR',name:s.brand,
+        description:(plan==='yearly'?'Yearly':'Monthly')+' plan',
+        prefill:{name:u.name||'',email:u.email||'',contact:u.phone||''},
+        theme:{color:'#0E6B59'},
+        handler:function(r){
+          var u2=me();
+          if(!u2||!r||!r.razorpay_payment_id)return;
+          if(db.subs.some(function(x){return x.utr===r.razorpay_payment_id;}))return;
+          grantAccess(u2,plan,r.razorpay_payment_id,'razorpay',true);
+        }
+      });
+      rz.on('payment.failed',function(){toast('Payment failed. You were not charged. Please try again.');});
+      rz.open();
+    }catch(e){toast('Could not start payment. Check the Razorpay key in Owner settings.');}
+  },
+  confirmUpi:function(el){var x=db.subs.find(function(y){return y.id===el.dataset.id;});if(x){x.verified=true;saveRender();toast('Payment confirmed');}},
+  revoke:function(el){var x=db.subs.find(function(y){return y.id===el.dataset.id;});if(x){x.status='rejected';x.decidedAt=Date.now();saveRender();toast('Access removed');}},
   cancelPending:function(){var u=me();db.subs=db.subs.filter(function(s){return !(s.userId===u.id&&s.status==='pending');});saveRender();},
   tab:function(el){ui.tab=el.dataset.v;render();},
   cat:function(el){ui.cat=el.dataset.v;render();},
@@ -613,7 +651,8 @@ var F={
     var utr=v(f,'utr'),u=me();
     if(!/^\d{12}$/.test(utr)){toast('The transaction ID has 12 digits.');return;}
     if(db.subs.some(function(s){return s.utr===utr&&s.status!=='rejected';})){toast('This transaction ID was already submitted.');return;}
-    db.subs.push({id:uid(),userId:u.id,plan:ui.plan,amount:planAmt(ui.plan),utr:utr,status:'pending',requestedAt:Date.now()});
+    if(db.settings.instantUpi){grantAccess(u,ui.plan,utr,'upi',false);return;}
+    db.subs.push({id:uid(),userId:u.id,plan:ui.plan,amount:planAmt(ui.plan),utr:utr,method:'upi',status:'pending',requestedAt:Date.now()});
     saveRender();
   },
   listing:function(f){
@@ -649,7 +688,7 @@ var F={
     if(brand.length<2){toast('Enter a company name.');return;}
     if(!/^[\w.\-]{2,}@[A-Za-z]{2,}$/.test(upi)){toast('Enter a valid UPI ID, like name@bank.');return;}
     if(!(m>0&&y>0)){toast('Enter both prices in rupees.');return;}
-    db.settings.brand=brand;db.settings.upiId=upi;db.settings.monthly=m;db.settings.yearly=y;
+    db.settings.brand=brand;db.settings.upiId=upi;db.settings.monthly=m;db.settings.yearly=y;db.settings.razorpayKey=v(f,'rzp');db.settings.instantUpi=v(f,'inst')!=='0';
     saveRender();toast('Settings saved');
   }
 };
