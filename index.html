@@ -199,6 +199,27 @@ h3.sec{margin:26px 0 10px}
   .item .th{width:60px;height:60px}
   .item .act{grid-column:1/-1;justify-content:flex-start}
 }
+
+/* product page and chat */
+.lc-buy{margin-top:4px}
+.ip{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:22px;align-items:start;margin-top:16px}
+.ip>*{min-width:0}
+.ph.big{aspect-ratio:4/3}
+.facts2{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:0}
+.facts2 dt{font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.facts2 dd{margin:2px 0 0;font-weight:600}
+.num{font-family:var(--font-display);font-weight:800;font-size:1.3rem;margin:4px 0 0}
+.msgs{display:flex;flex-direction:column;gap:8px;height:300px;overflow-y:auto;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+.msg{max-width:82%;padding:8px 12px;border-radius:12px;display:flex;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink)}
+.msg.them{align-self:flex-start;background:var(--surface-2)}
+.msg small{font-size:.7rem;opacity:.75}
+.chat-f{display:flex;gap:8px}
+.chat-f input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.threads{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.chat-row:hover{box-shadow:var(--shadow)}
+.chat-row,.lc[role=button]{cursor:pointer}
+@media (max-width:820px){.ip{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -210,6 +231,14 @@ h3.sec{margin:26px 0 10px}
 <script>
 (function(){
 'use strict';
+/* ===== OWNER SETUP: edit these two lines, then host the file =====
+   CLOUD_URL    your Firebase Realtime Database URL, for example 'https://my-twice-default-rtdb.firebaseio.com'.
+                This is what lets buyers see every seller's products and lets buyers and sellers chat across devices.
+                Leave '' to keep everything in each visitor's own browser (preview mode).
+   RAZORPAY_KEY your public Razorpay Key ID (starts with rzp_). Never put the secret key here. */
+var CLOUD_URL='';
+var RAZORPAY_KEY='';
+var CLOUD=String(CLOUD_URL).replace(/\/+$/,'');
 var KEY='marupadi_v1', DAY=86400000;
 var CATS=['Phones & tablets','Laptops & computers','Home appliances','Furniture','Books & study','Vehicles & bikes','Fashion','Other'];
 var CONDS=['Like new','Good','Fair','Needs repair'];
@@ -224,7 +253,7 @@ function defaults(){
   var now=Date.now();
   function mk(t,c,cond,p,city,d){return {id:uid(),sellerId:'sample',sellerName:'Sample seller',contact:'',title:t,cat:c,cond:cond,price:p,city:city,desc:d,photo:'',status:'live',sample:true,createdAt:now};}
   return {
-    users:[],session:null,subs:[],orders:[],
+    users:[],session:null,subs:[],orders:[],chats:[],msgs:[],seen:{},
     listings:[
       mk('Redmi Note 10 Pro, 6GB/128GB','Phones & tablets','Good',8500,'T. Nagar, Chennai','Two years old, battery lasts a full day. Box, charger and a screen guard included.'),
       mk('Lenovo ThinkPad T480, i5, 8GB','Laptops & computers','Good',19000,'Velachery, Chennai','256GB SSD, new keyboard fitted last year. Light scratches on the lid.'),
@@ -236,25 +265,136 @@ function defaults(){
     settings:{brand:'Twice',upiId:'9176683102@fam',monthly:50,yearly:150,pinHash:'',razorpayKey:'',instantUpi:true}
   };
 }
+function fresh(){var d=defaults();if(CLOUD)d.listings=[];return d;}
 function load(){
   try{
     var r=localStorage.getItem(KEY);
     if(r){var p=JSON.parse(r),d=defaults();
       p.settings=Object.assign(d.settings,p.settings||{});
-      ['users','subs','orders','listings'].forEach(function(k){if(!Array.isArray(p[k]))p[k]=d[k];});
+      ['users','subs','orders','listings','chats','msgs'].forEach(function(k){if(!Array.isArray(p[k]))p[k]=d[k];});
       if(!('session' in p))p.session=null;
+      if(!p.seen||typeof p.seen!=='object')p.seen={};
+      if(CLOUD)p.listings=p.listings.filter(function(l){return !l.sample;});
       return p;}
   }catch(e){}
-  return defaults();
+  return fresh();
 }
 var db=load();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(db));return true;}catch(e){return false;}}
+if(RAZORPAY_KEY)db.settings.razorpayKey=RAZORPAY_KEY;
+function saveLocal(){try{localStorage.setItem(KEY,JSON.stringify(db));return true;}catch(e){return false;}}
+function save(){var ok=saveLocal();kick(false);return ok;}
 
 var ui={authTab:'google',otp:null,otpPhone:'',otpName:'',plan:'yearly',payTab:(db.settings.razorpayKey?'card':'upi'),tab:'',q:'',cat:'All',modal:null,
   adminOpen:false,adminAuthed:false,adminTab:'overview',confirmId:null,confirmReset:false,photo:''};
 
 var app=document.getElementById('app'), toastEl=document.getElementById('toast'), tt=null;
 function toast(m){toastEl.textContent=m;toastEl.classList.add('on');clearTimeout(tt);tt=setTimeout(function(){toastEl.classList.remove('on');},2800);}
+
+/* ---------- online sync (Firebase Realtime Database over REST) ---------- */
+var COLL=['users','listings','orders','subs','chats','msgs'];
+var SNAPKEY=KEY+'_snap';
+var snap=(function(){try{return JSON.parse(localStorage.getItem(SNAPKEY))||{};}catch(e){return {};}})();
+var busy=false,again=false,settingsDirty=false,syncState={ok:false,at:0,err:''};
+function snapSave(){try{localStorage.setItem(SNAPKEY,JSON.stringify(snap));}catch(e){}}
+function cfetch(method,path,body){
+  var o={method:method};
+  if(body!==undefined){o.headers={'Content-Type':'application/json'};o.body=JSON.stringify(body);}
+  return fetch(CLOUD+'/twice/'+path+'.json',o).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});
+}
+function stamp(r){return r.createdAt||r.requestedAt||r.at||0;}
+async function flush(){
+  var jobs=[];
+  COLL.forEach(function(c){
+    var sc=snap[c]=snap[c]||{},cur={};
+    db[c].forEach(function(r){if(!r.sample)cur[r.id]=JSON.stringify(r);});
+    Object.keys(cur).forEach(function(id){if(sc[id]!==cur[id])jobs.push(cfetch('PUT',c+'/'+id,JSON.parse(cur[id])).then(function(){sc[id]=cur[id];}));});
+    Object.keys(sc).forEach(function(id){if(!(id in cur))jobs.push(cfetch('DELETE',c+'/'+id).then(function(){delete sc[id];}));});
+  });
+  if(settingsDirty){var o=Object.assign({},db.settings);delete o.pinHash;jobs.push(cfetch('PUT','settings',o).then(function(){settingsDirty=false;}));}
+  await Promise.all(jobs);
+}
+async function pull(list){
+  var changed=false;
+  await Promise.all(list.map(async function(c){
+    var r=await cfetch('GET',c);
+    if(c==='settings'){
+      if(r&&!settingsDirty){
+        var keep=db.settings.pinHash,before=JSON.stringify(db.settings);
+        Object.assign(db.settings,r);db.settings.pinHash=keep;
+        if(RAZORPAY_KEY)db.settings.razorpayKey=RAZORPAY_KEY;
+        if(JSON.stringify(db.settings)!==before)changed=true;
+      }
+      return;
+    }
+    var sc=snap[c]=snap[c]||{},rmap=r||{},localIds={},out=[];
+    db[c].forEach(function(l){localIds[l.id]=l;});
+    Object.keys(rmap).forEach(function(id){
+      var rec=rmap[id];if(!rec||typeof rec!=='object')return;
+      rec.id=rec.id||id;
+      var loc=localIds[id];
+      if(sc[id]!==undefined&&!loc)return;
+      if(loc&&sc[id]!==JSON.stringify(loc)){out.push(loc);return;}
+      out.push(rec);sc[id]=JSON.stringify(rec);
+    });
+    db[c].forEach(function(l){
+      if(l.sample){out.push(l);return;}
+      if(!(l.id in rmap)){
+        if(sc[l.id]===undefined||sc[l.id]!==JSON.stringify(l))out.push(l);
+        else delete sc[l.id];
+      }
+    });
+    out.sort(function(a,b){return stamp(a)-stamp(b)||(a.id<b.id?-1:1);});
+    if(JSON.stringify(out)!==JSON.stringify(db[c])){db[c]=out;changed=true;}
+  }));
+  return changed;
+}
+async function tick(slow){
+  if(!CLOUD||busy)return;
+  busy=true;
+  try{
+    await flush();
+    var ch=await pull(slow?COLL.concat(['settings']):['users','orders','subs','chats','msgs']);
+    syncState={ok:true,at:Date.now(),err:''};
+    saveLocal();
+    if(ch)afterSync();
+  }catch(e){syncState.ok=false;syncState.err=String(e&&e.message||e);}
+  finally{busy=false;snapSave();if(again){again=false;setTimeout(function(){kick(false);},60);}}
+}
+function kick(slow){if(!CLOUD)return;if(busy){again=true;return;}return tick(slow);}
+function liveView(){
+  if(ui.adminOpen)return ui.adminAuthed&&ui.adminTab!=='settings';
+  var u=me();if(!u||!u.role)return false;
+  if(!activeSub(u.id))return true;
+  return !!ui.page||ui.tab==='browse'||ui.tab==='requests'||ui.tab==='chats';
+}
+function softRender(){
+  var a=document.activeElement,id=a&&a.id,val=a&&a.value,ss=a&&a.selectionStart;
+  var typing=a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName||'');
+  if(typing&&id!=='chat-in'&&id!=='q')return;
+  var u=me();if(u&&ui.page){var c=currentChat(u);if(c)markSeen(c,u);}
+  render();
+  if(typing){var n=document.getElementById(id);if(n){n.value=val;n.focus();try{n.setSelectionRange(ss,ss);}catch(e){}}}
+}
+function afterSync(){if(liveView())softRender();}
+
+/* ---------- chat helpers ---------- */
+function listingById(id){return db.listings.find(function(l){return l.id===id;});}
+function chatById(id){return db.chats.find(function(c){return c.id===id;});}
+function chatFor(lid,bid){return db.chats.find(function(c){return c.listingId===lid&&c.buyerId===bid;});}
+function msgsOf(c){return db.msgs.filter(function(m){return m.chatId===c.id;}).sort(function(a,b){return a.at-b.at||(a.id<b.id?-1:1);});}
+function lastAt(c){var m=msgsOf(c);return m.length?m[m.length-1].at:c.createdAt;}
+function threadsForListing(l){return db.chats.filter(function(c){return c.listingId===l.id;}).sort(function(a,b){return lastAt(b)-lastAt(a);});}
+function threadsOf(u){return db.chats.filter(function(c){var l=listingById(c.listingId);return c.buyerId===u.id||(l&&l.sellerId===u.id);}).sort(function(a,b){return lastAt(b)-lastAt(a);});}
+function isUnread(c,u){var m=msgsOf(c),x=m[m.length-1];return !!x&&x.from!==u.id&&x.at>(db.seen[u.id+'_'+c.id]||0);}
+function markSeen(c,u){var m=msgsOf(c),t=m.length?m[m.length-1].at:0,k=u.id+'_'+c.id;if((db.seen[k]||0)!==t){db.seen[k]=t;saveLocal();}}
+function unreadCount(u){return threadsOf(u).filter(function(c){return isUnread(c,u);}).length;}
+function newChat(lid,bid){var c={id:uid(),listingId:lid,buyerId:bid,createdAt:Date.now()};db.chats.push(c);return c;}
+function currentChat(u){
+  if(!ui.page)return null;
+  var l=listingById(ui.page.id);if(!l)return null;
+  if(l.sellerId===u.id)return chatById(ui.page.chatId)||threadsForListing(l)[0]||null;
+  return chatFor(l.id,u.id)||null;
+}
 
 /* ---------- data helpers ---------- */
 function me(){return db.users.find(function(u){return u.id===db.session;});}
@@ -307,6 +447,7 @@ function view(){
   if(!u)return shell(authView());
   if(!u.role)return shell(roleView());
   if(!activeSub(u.id))return shell(payView(u));
+  if(ui.page){if(listingById(ui.page.id))return shell(itemPage(u));ui.page=null;}
   return shell(u.role==='buyer'?buyerView(u):sellerView(u));
 }
 
@@ -398,39 +539,93 @@ function payView(u){
 }
 
 /* ----- buyer ----- */
+function tabBtn(id,label,cur){return '<button class="tab" role="tab" aria-selected="'+(cur===id)+'" data-act="tab" data-v="'+id+'">'+label+'</button>';}
 function cardHtml(l){
-  return '<button class="lc" data-act="open" data-id="'+l.id+'"><span class="ph">'+(l.photo?'<img alt="" src="'+l.photo+'">':'')+'<span class="cn">'+esc(l.cat)+'</span></span>'+
+  var sold=l.status==='sold';
+  return '<div class="lc" data-act="open" data-id="'+l.id+'" role="button" tabindex="0" aria-label="'+esc(l.title)+'"><span class="ph">'+(l.photo?'<img alt="" src="'+l.photo+'">':'')+'<span class="cn">'+esc(l.cat)+'</span></span>'+
     '<span class="lc-body"><span class="lc-title">'+esc(l.title)+'</span><span class="price">'+inr(l.price)+'</span>'+
-    '<span class="meta"><span class="pill">'+esc(l.cond)+'</span>'+(l.sample?'<span class="pill">Sample</span>':'')+'<span class="muted small">'+esc(l.city)+'</span></span></span></button>';
+    '<span class="meta"><span class="pill">'+esc(l.cond)+'</span>'+(l.sample?'<span class="pill">Sample</span>':'')+(sold?'<span class="pill bad">Sold</span>':'')+'<span class="muted small">'+esc(l.city)+'</span></span>'+
+    '<span class="muted small">Seller: '+esc(l.sellerName)+(l.contact?' · +91 '+esc(l.contact):'')+'</span>'+
+    '<span class="btn sm block lc-buy" data-act="open" data-id="'+l.id+'">'+(sold?'View details':'Buy')+'</span></span></div>';
 }
 function gridHtml(){
   var q=ui.q.trim().toLowerCase();
   var rows=db.listings.filter(function(l){
-    if(l.status!=='live')return false;
     if(ui.cat!=='All'&&l.cat!==ui.cat)return false;
-    if(q&&(l.title+' '+l.desc+' '+l.city+' '+l.cat).toLowerCase().indexOf(q)<0)return false;
+    if(q&&(l.title+' '+l.desc+' '+l.city+' '+l.cat+' '+l.sellerName).toLowerCase().indexOf(q)<0)return false;
     return true;
-  }).sort(function(a,b){return b.createdAt-a.createdAt;});
-  if(!rows.length)return '<div class="empty">No items match. Try another word or category.</div>';
-  return '<div class="grid">'+rows.map(cardHtml).join('')+'</div>';
+  }).sort(function(a,b){return (a.status==='sold')-(b.status==='sold')||b.createdAt-a.createdAt;});
+  if(!rows.length)return '<div class="empty">'+(db.listings.length?'No items match. Try another word or category.':'No products have been listed yet. Check back soon.')+'</div>';
+  return '<p class="muted small" style="margin-bottom:10px">'+rows.length+' item'+(rows.length>1?'s':'')+' from all sellers</p><div class="grid">'+rows.map(cardHtml).join('')+'</div>';
+}
+function browseHtml(){
+  return '<div class="toolbar"><div class="field search"><label for="q">Search all products</label><input id="q" type="search" placeholder="Phone, table, bike…" value="'+esc(ui.q)+'"></div>'+
+    '<div class="chips">'+['All'].concat(CATS).map(function(k){return '<button class="cat" data-act="cat" data-v="'+esc(k)+'" aria-pressed="'+(ui.cat===k)+'">'+esc(k)+'</button>';}).join('')+'</div></div>'+
+    '<div id="grid">'+gridHtml()+'</div>';
+}
+function chatsHtml(u){
+  var T=threadsOf(u);
+  if(!T.length)return '<div class="empty">No chats yet. Open a product and send a message, or wait for buyers to write to you.</div>';
+  return '<div class="list">'+T.map(function(c){
+    var l=listingById(c.listingId),b=userById(c.buyerId),isBuyer=c.buyerId===u.id,ms=msgsOf(c),last=ms[ms.length-1];
+    var who=isBuyer?{n:l?l.sellerName:'Seller',p:l?l.contact:''}:{n:b?b.name:'Buyer',p:b?b.phone:''};
+    return '<div class="item chat-row" role="button" tabindex="0" data-act="openChat" data-id="'+c.id+'"><div class="th">'+(l&&l.photo?'<img alt="" src="'+l.photo+'">':'')+'</div><div><b>'+esc(l?l.title:'Removed listing')+'</b>'+
+      '<p class="small muted" style="margin-top:4px">'+(isBuyer?'Seller: ':'Buyer: ')+esc(who.n)+(who.p?' · +91 '+esc(who.p):'')+'</p>'+
+      (last?'<p class="small" style="margin-top:4px;overflow-wrap:anywhere">'+(last.from===u.id?'You: ':'')+esc(last.text.slice(0,90))+'</p>':'')+'</div><div>'+(isUnread(c,u)?'<span class="pill good">New</span>':'')+'</div></div>';
+  }).join('')+'</div>';
 }
 function buyerView(u){
-  var t=ui.tab==='requests'?'requests':'browse', c='';
-  if(t==='browse'){
-    c='<div class="toolbar"><div class="field search"><label for="q">Search</label><input id="q" type="search" placeholder="Phone, table, bike…" value="'+esc(ui.q)+'"></div>'+
-      '<div class="chips">'+['All'].concat(CATS).map(function(k){return '<button class="cat" data-act="cat" data-v="'+esc(k)+'" aria-pressed="'+(ui.cat===k)+'">'+esc(k)+'</button>';}).join('')+'</div></div>'+
-      '<div id="grid">'+gridHtml()+'</div>';
-  }else{
+  var t=(ui.tab==='requests'||ui.tab==='chats')?ui.tab:'browse',c='',n=unreadCount(u);
+  if(t==='browse')c=browseHtml();
+  else if(t==='chats')c=chatsHtml(u);
+  else{
     var mine=db.orders.filter(function(o){return o.buyerId===u.id;}).sort(function(a,b){return b.createdAt-a.createdAt;});
     c=mine.length?'<div class="list">'+mine.map(function(o){
-      var l=db.listings.find(function(x){return x.id===o.listingId;});
+      var l=listingById(o.listingId);
       if(!l)return '<div class="item" style="grid-template-columns:1fr"><span class="muted">This listing was removed.</span></div>';
       return '<div class="item"><div class="th">'+(l.photo?'<img alt="" src="'+l.photo+'">':'')+'</div><div><b>'+esc(l.title)+'</b><div class="meta" style="margin-top:4px"><span class="price">'+inr(l.price)+'</span>'+(l.status==='sold'?'<span class="pill bad">Sold</span>':'<span class="pill good">Requested</span>')+'</div>'+
-        '<p class="small muted" style="margin-top:6px">'+esc(l.city)+' · Seller contact: <b style="color:var(--ink)">'+esc(l.contact||'Sample listing')+'</b></p></div><div></div></div>';
-    }).join('')+'</div>':'<div class="empty">You have not requested anything yet. Open an item and choose “Request to buy”.</div>';
+        '<p class="small muted" style="margin-top:6px">'+esc(l.city)+' · Seller: '+esc(l.sellerName)+' · <b style="color:var(--ink)">'+(l.contact?'+91 '+esc(l.contact):'Sample listing')+'</b></p></div><div><button class="btn ghost sm" data-act="open" data-id="'+l.id+'">Open</button></div></div>';
+    }).join('')+'</div>':'<div class="empty">You have not sent any buy requests yet. Press Buy on a product, then send a buy request.</div>';
   }
-  return '<section class="page"><div class="page-head"><h2>'+(t==='browse'?'Find something':'My requests')+'</h2></div>'+
-    '<div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="'+(t==='browse')+'" data-act="tab" data-v="browse">Browse</button><button class="tab" role="tab" aria-selected="'+(t==='requests')+'" data-act="tab" data-v="requests">My requests</button></div>'+c+'</section>';
+  var H={browse:'All products',requests:'My requests',chats:'My chats'};
+  return '<section class="page"><div class="page-head"><h2>'+H[t]+'</h2></div><div class="tabs" role="tablist">'+tabBtn('browse','Browse all',t)+tabBtn('requests','My requests',t)+tabBtn('chats','Chats'+(n?' ('+n+')':''),t)+'</div>'+c+'</section>';
+}
+function chatPanel(c,l,u){
+  var own=l.sellerId===u.id,b=c?userById(c.buyerId):null,head='';
+  if(own&&b)head='<p class="small" style="margin:10px 0">Buyer: <b>'+esc(b.name)+'</b>'+(b.phone?' · +91 '+esc(b.phone)+' <a class="link" href="tel:+91'+esc(b.phone)+'">Call</a>':'')+'</p>';
+  var ms=c?msgsOf(c):[];
+  var body=ms.length?ms.map(function(m){var mine=m.from===u.id;return '<div class="msg '+(mine?'me':'them')+'"><span>'+esc(m.text)+'</span><small>'+ftime(m.at)+'</small></div>';}).join(''):'<p class="muted small" style="text-align:center;margin:auto">No messages yet. Say hello and ask about the item.</p>';
+  var blocked=!own&&!u.phone;
+  return head+'<div class="msgs" id="msgs">'+body+'</div><form class="chat-f" data-form="send" novalidate><input id="chat-in" name="text" maxlength="500" autocomplete="off" placeholder="'+(blocked?'Add your mobile number to chat':'Type a message')+'"'+(blocked?' disabled':'')+'><button class="btn" type="submit"'+(blocked?' disabled':'')+'>Send</button></form>';
+}
+function itemPage(u){
+  var l=listingById(ui.page.id),own=l.sellerId===u.id,sold=l.status==='sold',phone=l.contact||'';
+  var ord=db.orders.find(function(o){return o.listingId===l.id&&o.buyerId===u.id;});
+  var facts=[['Category',l.cat],['Condition',l.cond],['Area',l.city],['Listed on',fdate(l.createdAt)],['Availability',sold?'Sold':'Available']];
+  var left='<div class="stack"><div class="panel flat" style="padding:0;overflow:hidden"><span class="ph big">'+(l.photo?'<img alt="'+esc(l.title)+'" src="'+l.photo+'">':'')+'<span class="cn">'+esc(l.cat)+'</span></span></div>'+
+    '<div class="panel"><h2>'+esc(l.title)+'</h2><div class="meta" style="margin:10px 0"><span class="price">'+inr(l.price)+'</span>'+(sold?'<span class="pill bad">Sold</span>':'<span class="pill good">Available</span>')+(l.sample?'<span class="pill">Sample</span>':'')+'</div>'+
+    '<dl class="facts2">'+facts.map(function(f){return '<div><dt>'+f[0]+'</dt><dd>'+esc(f[1])+'</dd></div>';}).join('')+'</dl>'+
+    '<h3 style="margin:18px 0 6px;font-size:1rem">About this item</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(l.desc||'The seller has not added a description.')+'</p></div></div>';
+  var sellerCard='<div class="panel"><h3>Seller contact</h3><p style="margin-top:8px"><b>'+esc(l.sellerName)+'</b></p>'+
+    (phone?'<p class="num">+91 '+esc(phone)+'</p><div class="meta" style="margin-top:6px"><a class="btn ghost sm" href="tel:+91'+esc(phone)+'">Call</a><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/91'+esc(phone)+'">WhatsApp</a></div>':'<p class="muted small" style="margin-top:6px">Sample listing, no contact number.</p>')+
+    '<p class="muted small" style="margin-top:10px">Meet in a public place and pay the seller directly. '+esc(db.settings.brand)+' does not hold the money.</p></div>';
+  var buyerCard='';
+  if(!own)buyerCard='<div class="panel"><h3>Your contact</h3>'+(u.phone?'<p class="num">+91 '+esc(u.phone)+'</p><p class="muted small">The seller can see your name and this number.</p>':
+    '<form class="form" data-form="myphone" novalidate style="margin-top:8px"><div class="field"><label for="my-phone">Your mobile number</label><input id="my-phone" name="phone" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"><span class="hint">The seller will see it. Needed to buy or chat.</span></div><button class="btn" type="submit">Save number</button></form>')+'</div>';
+  var act='';
+  if(own)act='<div class="panel"><h3>Your listing</h3><p class="muted small" style="margin-top:6px">Buyers can see your number above and write to you below.</p></div>';
+  else if(l.sample)act='<div class="panel"><p class="muted small">This is a sample listing for preview, so buying and chat are switched off.</p></div>';
+  else if(sold)act='<div class="panel"><span class="pill bad">Sold</span></div>';
+  else if(ord)act='<div class="panel"><span class="pill good">Buy request sent</span><p class="muted small" style="margin-top:8px">Chat with the seller below and agree on a place and time to meet.</p></div>';
+  else act='<div class="panel"><button class="btn block" data-act="confirmBuy" data-id="'+l.id+'">Send buy request</button><p class="muted small" style="margin-top:8px">The seller is told you want this item. You can also chat first.</p></div>';
+  var c=currentChat(u),chatH='';
+  if(own){
+    var T=threadsForListing(l);
+    chatH='<div class="panel"><h3>Buyer messages</h3>'+(T.length?'<div class="threads">'+T.map(function(x){var b=userById(x.buyerId);return '<button class="cat" data-act="openThread" data-id="'+x.id+'" aria-pressed="'+(!!c&&c.id===x.id)+'">'+esc(b?b.name:'Buyer')+(isUnread(x,u)?' (new)':'')+'</button>';}).join('')+'</div>':'<p class="muted small" style="margin-top:8px">No buyer has written yet.</p>')+(c?chatPanel(c,l,u):'')+'</div>';
+  }else if(!l.sample){
+    chatH='<div class="panel"><h3>Chat with seller</h3>'+chatPanel(c,l,u)+'</div>';
+  }
+  return '<section class="page"><button class="btn ghost sm" data-act="back">← Back to '+(own?'my listings':'all products')+'</button><div class="ip">'+left+'<div class="stack">'+sellerCard+buyerCard+act+chatH+'</div></div></section>';
 }
 function modalHtml(u){
   var l=db.listings.find(function(x){return x.id===ui.modal;});
@@ -450,7 +645,7 @@ function modalHtml(u){
 
 /* ----- seller ----- */
 function sellerView(u){
-  var t=ui.tab==='mine'?'mine':'new', c='';
+  var t=(['mine','browse','chats'].indexOf(ui.tab)>=0)?ui.tab:'new', c='';
   if(t==='new'){
     c='<form class="panel form" data-form="listing" novalidate>'+
       '<div class="field"><label for="l-title">Item name</label><input id="l-title" name="title" maxlength="80" placeholder="e.g. Samsung 43” smart TV"></div>'+
@@ -458,10 +653,12 @@ function sellerView(u){
       '<div class="field"><label for="l-cond">Condition</label><select id="l-cond" name="cond">'+CONDS.map(function(k){return '<option>'+esc(k)+'</option>';}).join('')+'</select></div></div>'+
       '<div class="row2"><div class="field"><label for="l-price">Price (₹)</label><input id="l-price" name="price" inputmode="numeric" placeholder="e.g. 12000"></div>'+
       '<div class="field"><label for="l-city">Area and city</label><input id="l-city" name="city" maxlength="60" placeholder="e.g. Porur, Chennai"></div></div>'+
-      '<div class="field"><label for="l-contact">Contact number for buyers</label><input id="l-contact" name="contact" inputmode="numeric" maxlength="10" value="'+esc(u.phone||'')+'" placeholder="10-digit mobile"><span class="hint">Shown only to buyers who send a request.</span></div>'+
+      '<div class="field"><label for="l-contact">Contact number for buyers</label><input id="l-contact" name="contact" inputmode="numeric" maxlength="10" value="'+esc(u.phone||'')+'" placeholder="10-digit mobile"><span class="hint">Shown to everyone who views your listing, so buyers can call you or chat.</span></div>'+
       '<div class="field"><label for="l-desc">Description</label><textarea id="l-desc" name="desc" maxlength="500" placeholder="Age, what is included, any faults"></textarea></div>'+
       '<div class="field"><label for="photo">Photo</label><input id="photo" type="file" accept="image/*"><div class="prev" id="photoPrev"></div></div>'+
       '<button class="btn" type="submit">Publish listing</button></form>';
+  }else if(t==='browse'){c=browseHtml();
+  }else if(t==='chats'){c=chatsHtml(u);
   }else{
     var mine=db.listings.filter(function(l){return l.sellerId===u.id;}).sort(function(a,b){return b.createdAt-a.createdAt;});
     c=mine.length?'<div class="list">'+mine.map(function(l){
@@ -472,8 +669,9 @@ function sellerView(u){
         '<div class="act"><button class="btn ghost sm" data-act="toggleSold" data-id="'+l.id+'">'+(l.status==='sold'?'Relist':'Mark sold')+'</button>'+del+'</div>'+rh+'</div>';
     }).join('')+'</div>':'<div class="empty">You have no listings yet. Use “List an item” to add your first.</div>';
   }
-  return '<section class="page"><div class="page-head"><h2>'+(t==='new'?'List an item':'My listings')+'</h2></div>'+
-    '<div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="'+(t==='new')+'" data-act="tab" data-v="new">List an item</button><button class="tab" role="tab" aria-selected="'+(t==='mine')+'" data-act="tab" data-v="mine">My listings</button></div>'+c+'</section>';
+  var SH={'new':'List an item',mine:'My listings',browse:'All products',chats:'My chats'},nu=unreadCount(u);
+  return '<section class="page"><div class="page-head"><h2>'+SH[t]+'</h2></div>'+
+    '<div class="tabs" role="tablist">'+tabBtn('new','List an item',t)+tabBtn('mine','My listings',t)+tabBtn('browse','Browse all',t)+tabBtn('chats','Chats'+(nu?' ('+nu+')':''),t)+'</div>'+c+'</section>';
 }
 
 /* ----- admin ----- */
@@ -514,14 +712,15 @@ function adminView(){
     c='<form class="panel form" data-form="settings" novalidate><h3>Business settings</h3>'+
       '<div class="row2"><div class="field"><label for="s-brand">Company name</label><input id="s-brand" name="brand" maxlength="24" value="'+esc(s.brand)+'"></div>'+
       '<div class="field"><label for="s-upi">UPI ID for payments</label><input id="s-upi" name="upi" value="'+esc(s.upiId)+'"></div></div>'+
-      '<div class="field"><label for="s-rzp">Razorpay Key ID (starts with rzp_)</label><input id="s-rzp" name="rzp" placeholder="rzp_live_xxxxxxxxxxxx" value="'+esc(s.razorpayKey||'')+'"><span class="hint">Paste the public Key ID only, never the secret. With this set, card, UPI and net banking payments give access instantly.</span></div>'+
+      '<div class="field"><label for="s-rzp">Razorpay Key ID (starts with rzp_)</label><input id="s-rzp" name="rzp" placeholder="rzp_live_xxxxxxxxxxxx" value="'+esc(s.razorpayKey||'')+'"><span class="hint">Paste the public Key ID only, never the secret. With this set, card, UPI and net banking payments give access instantly. Customers only see it if online sync is on, or if you also put it in RAZORPAY_KEY at the top of the script.</span></div>'+
       '<div class="field"><label for="s-inst">Direct UPI payments</label><select id="s-inst" name="inst"><option value="1"'+(s.instantUpi?' selected':'')+'>Give access instantly, I confirm later</option><option value="0"'+(!s.instantUpi?' selected':'')+'>Wait for my approval</option></select></div>'+
       '<div class="row2"><div class="field"><label for="s-monthly">Monthly price (₹)</label><input id="s-monthly" name="monthly" inputmode="numeric" value="'+s.monthly+'"></div>'+
       '<div class="field"><label for="s-yearly">Yearly price (₹)</label><input id="s-yearly" name="yearly" inputmode="numeric" value="'+s.yearly+'"></div></div>'+
       '<button class="btn" type="submit" style="align-self:flex-start">Save settings</button></form>'+
       '<form class="panel form" data-form="changepin" style="margin-top:18px" novalidate><h3>Change owner PIN</h3><div class="row2"><div class="field"><label for="s-pin">New PIN</label><input id="s-pin" name="pin" type="password" autocomplete="new-password"></div><div class="field"><label for="s-pin2">Repeat PIN</label><input id="s-pin2" name="pin2" type="password" autocomplete="new-password"></div></div><button class="btn ghost" type="submit" style="align-self:flex-start">Update PIN</button></form>'+
+      '<div class="panel" style="margin-top:18px"><h3 style="margin-bottom:10px">Online sync</h3><p class="muted small">'+(CLOUD?(syncState.ok?'Connected. Last synced '+ftime(syncState.at)+'. Products, members, payments and chats are shared between all devices.':'Not connected yet'+(syncState.err?' ('+esc(syncState.err)+')':'')+'. Check CLOUD_URL and the database rules.'):'Not set up. Products, members and chats stay inside each visitor’s own browser, so buyers cannot see other sellers’ products and chat cannot reach the other person. Set CLOUD_URL at the top of the script to switch it on.')+'</p></div>'+
       '<div class="panel" style="margin-top:18px"><h3 style="margin-bottom:10px">Before real customers use this</h3><ul class="check">'+
-      '<li>Host it on your own domain with a server and database. Right now each browser keeps its own data, so members, listings and payments are not shared between devices.</li>'+
+      '<li>Host it on your own domain and turn on online sync (CLOUD_URL at the top of the script). Without it each browser keeps its own data, so products, chats, members and payments are not shared between devices.</li>'+
       '<li>Connect real Google sign-in (a Google Cloud OAuth client ID) and an SMS OTP service. Both are simulated here.</li>'+
       '<li>Razorpay is wired in: add your Key ID in Settings above. For production, also verify each payment on a server with your Razorpay secret before granting access. Direct UPI to a personal ID cannot be verified by a website, so those are confirmed by you after access is given.</li>'+
       '<li>Make the owner login server-side. The PIN here only protects this browser.</li></ul></div>'+
@@ -539,23 +738,24 @@ function makeQR(){
   try{new QRCode(box,{text:upiLink(),width:172,height:172,correctLevel:QRCode.CorrectLevel.M});}
   catch(e){box.innerHTML='<span class="small" style="color:#444">QR unavailable.</span>';}
 }
-function render(){app.innerHTML=view();makeQR();}
+function render(){app.innerHTML=view();makeQR();var m=document.getElementById('msgs');if(m)m.scrollTop=m.scrollHeight;}
 function saveRender(){if(!save())toast('Could not save in this browser. Storage may be full or blocked.');render();}
 
 /* ---------- actions ---------- */
-function signIn(o){
+async function signIn(o){
+  if(CLOUD){try{await tick(true);}catch(e){}}
   var u=db.users.find(function(x){return (o.email&&x.email===o.email)||(o.phone&&x.phone===o.phone);});
   if(!u){u={id:uid(),name:o.name,email:o.email||'',phone:o.phone||'',via:o.via,role:'',createdAt:Date.now()};db.users.push(u);}
   else if(o.name&&!u.name)u.name=o.name;
-  db.session=u.id;ui.otp=null;ui.tab=u.role==='seller'?'new':'browse';ui.modal=null;
+  db.session=u.id;ui.page=null;ui.otp=null;ui.tab=u.role==='seller'?'new':'browse';ui.modal=null;
   saveRender();
 }
 var A={
   authTab:function(el){ui.authTab=el.dataset.v;ui.otp=null;render();},
   changeNumber:function(){ui.otp=null;render();},
   setRole:function(el){var u=me();u.role=el.dataset.v;ui.tab=u.role==='seller'?'new':'browse';saveRender();},
-  switchRole:function(){var u=me();u.role=u.role==='buyer'?'seller':'buyer';ui.tab=u.role==='seller'?'new':'browse';ui.modal=null;saveRender();},
-  signOut:function(){db.session=null;ui.modal=null;ui.otp=null;saveRender();},
+  switchRole:function(){ui.page=null;var u=me();u.role=u.role==='buyer'?'seller':'buyer';ui.tab=u.role==='seller'?'new':'browse';ui.modal=null;saveRender();},
+  signOut:function(){db.session=null;ui.page=null;ui.modal=null;ui.otp=null;saveRender();},
   pickPlan:function(el){ui.plan=el.dataset.v;render();},
   payTab:function(el){ui.payTab=el.dataset.v;render();},
   copy:function(el){
@@ -587,9 +787,21 @@ var A={
   confirmUpi:function(el){var x=db.subs.find(function(y){return y.id===el.dataset.id;});if(x){x.verified=true;saveRender();toast('Payment confirmed');}},
   revoke:function(el){var x=db.subs.find(function(y){return y.id===el.dataset.id;});if(x){x.status='rejected';x.decidedAt=Date.now();saveRender();toast('Access removed');}},
   cancelPending:function(){var u=me();db.subs=db.subs.filter(function(s){return !(s.userId===u.id&&s.status==='pending');});saveRender();},
-  tab:function(el){ui.tab=el.dataset.v;render();},
+  tab:function(el){ui.tab=el.dataset.v;ui.page=null;if(ui.tab==='browse')kick(true);render();},
   cat:function(el){ui.cat=el.dataset.v;render();},
-  open:function(el){ui.modal=el.dataset.id;render();},
+  open:function(el){ui.page={id:el.dataset.id,chatId:null};ui.modal=null;var u=me(),c=currentChat(u);if(c)markSeen(c,u);render();window.scrollTo(0,0);},
+  back:function(){ui.page=null;render();window.scrollTo(0,0);},
+  openChat:function(el){var u=me(),c=chatById(el.dataset.id);if(!c||!listingById(c.listingId)){toast('This listing was removed.');return;}ui.page={id:c.listingId,chatId:c.id};markSeen(c,u);render();window.scrollTo(0,0);},
+  openThread:function(el){var u=me(),c=chatById(el.dataset.id);if(!c||!ui.page)return;ui.page.chatId=c.id;markSeen(c,u);render();},
+  confirmBuy:function(el){
+    var u=me(),l=listingById(el.dataset.id);
+    if(!l||l.sample||l.sellerId===u.id||l.status==='sold')return;
+    if(!u.phone){toast('Add your mobile number first so the seller can reach you.');return;}
+    if(!db.orders.some(function(o){return o.listingId===l.id&&o.buyerId===u.id;}))db.orders.push({id:uid(),listingId:l.id,buyerId:u.id,createdAt:Date.now(),status:'requested'});
+    var c=chatFor(l.id,u.id)||newChat(l.id,u.id);
+    db.msgs.push({id:uid(),chatId:c.id,from:u.id,text:'Hi, I would like to buy “'+l.title+'” for '+inr(l.price)+'. Is it still available?',at:Date.now()});
+    markSeen(c,u);saveRender();toast('Buy request sent to the seller.');
+  },
   closeModal:function(el,e){if(el.dataset.bg&&e.target!==el)return;ui.modal=null;render();},
   request:function(el){
     var u=me(),l=db.listings.find(function(x){return x.id===el.dataset.id;});
@@ -616,7 +828,7 @@ var A={
   adminDel:function(el){db.listings=db.listings.filter(function(x){return x.id!==el.dataset.id;});saveRender();toast('Listing removed');},
   resetAsk:function(){ui.confirmReset=true;render();},
   resetNo:function(){ui.confirmReset=false;render();},
-  resetYes:function(){var pin=db.settings.pinHash,set=db.settings;db=defaults();db.settings=Object.assign(db.settings,set);db.settings.pinHash=pin;ui.confirmReset=false;saveRender();toast('Preview data reset');}
+  resetYes:function(){var pin=db.settings.pinHash,set=db.settings;db=fresh();db.settings=Object.assign(db.settings,set);db.settings.pinHash=pin;ui.confirmReset=false;saveRender();toast('Preview data reset');}
 };
 document.addEventListener('click',function(e){
   var el=e.target.closest('[data-act]');
@@ -666,6 +878,22 @@ var F={
     if(!save()){db.listings.shift();render();toast('Could not save. The photo may be too large; try without it.');return;}
     render();toast('Listing published');
   },
+  myphone:function(f){
+    var ph=v(f,'phone'),u=me();
+    if(!/^[6-9]\d{9}$/.test(ph)){toast('Enter a valid 10-digit mobile number.');return;}
+    u.phone=ph;saveRender();toast('Number saved.');
+  },
+  send:function(f){
+    var u=me(),l=ui.page&&listingById(ui.page.id),t=v(f,'text');
+    if(!l||!t)return;
+    var c;
+    if(l.sellerId===u.id)c=chatById(ui.page.chatId)||threadsForListing(l)[0];
+    else{if(!u.phone){toast('Add your mobile number first.');return;}c=chatFor(l.id,u.id)||newChat(l.id,u.id);}
+    if(!c)return;
+    db.msgs.push({id:uid(),chatId:c.id,from:u.id,text:t.slice(0,500),at:Date.now()});
+    ui.page.chatId=c.id;markSeen(c,u);saveRender();
+    var i=document.getElementById('chat-in');if(i)i.focus();
+  },
   adminpin:async function(f){
     var pin=v(f,'pin'),s=db.settings;
     if(!s.pinHash){
@@ -688,7 +916,7 @@ var F={
     if(brand.length<2){toast('Enter a company name.');return;}
     if(!/^[\w.\-]{2,}@[A-Za-z]{2,}$/.test(upi)){toast('Enter a valid UPI ID, like name@bank.');return;}
     if(!(m>0&&y>0)){toast('Enter both prices in rupees.');return;}
-    db.settings.brand=brand;db.settings.upiId=upi;db.settings.monthly=m;db.settings.yearly=y;db.settings.razorpayKey=v(f,'rzp');db.settings.instantUpi=v(f,'inst')!=='0';
+    db.settings.brand=brand;db.settings.upiId=upi;db.settings.monthly=m;db.settings.yearly=y;db.settings.razorpayKey=v(f,'rzp');db.settings.instantUpi=v(f,'inst')!=='0';settingsDirty=true;
     saveRender();toast('Settings saved');
   }
 };
@@ -702,7 +930,7 @@ document.addEventListener('submit',function(e){
 document.addEventListener('input',function(e){
   var t=e.target;
   if(t.id==='q'){ui.q=t.value;var g=document.getElementById('grid');if(g)g.innerHTML=gridHtml();}
-  else if(t.id==='u-utr'||t.id==='m-phone'||t.id==='m-otp'||t.id==='l-contact'||t.id==='l-price'){t.value=t.value.replace(/\D/g,'');}
+  else if(t.id==='u-utr'||t.id==='m-phone'||t.id==='m-otp'||t.id==='l-contact'||t.id==='l-price'||t.id==='my-phone'){t.value=t.value.replace(/\D/g,'');}
 });
 document.addEventListener('change',function(e){
   if(e.target.id!=='photo')return;
@@ -725,8 +953,15 @@ document.addEventListener('change',function(e){
   };
   r.readAsDataURL(f);
 });
-document.addEventListener('keydown',function(e){if(e.key==='Escape'&&ui.modal){ui.modal=null;render();}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&ui.modal){ui.modal=null;render();}
+  if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.matches&&e.target.matches('.lc,.chat-row')){e.preventDefault();e.target.click();}});
 
+if(CLOUD){
+  setInterval(function(){if(!document.hidden)kick(false);},5000);
+  setInterval(function(){if(!document.hidden)kick(true);},30000);
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)kick(true);});
+  kick(true);
+}
 render();
 })();
 </script>
