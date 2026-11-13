@@ -1,0 +1,694 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Twice</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600&family=Noto+Sans+Tamil:wght@600&display=swap">
+<style>
+/* Layout concept: a calm sticky bar, a four-step path (sign in, role, subscribe, start) that opens into a listing grid; marigold appears only on prices. */
+:root{
+  --font-display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-tamil:'Noto Sans Tamil','Latha',sans-serif;
+  --bg:#F2F5F1; --surface:#FFFFFF; --surface-2:#E7EDE8; --ink:#13231E; --muted:#58695F; --line:#D3DDD6;
+  --accent:#0E6B59; --accent-ink:#FFFFFF; --gold:#F2B01E; --gold-ink:#33250A;
+  --good:#1B7F4B; --warn:#8F5A00; --bad:#B3261E;
+  --shadow:0 1px 2px rgba(19,35,30,.06),0 10px 28px rgba(19,35,30,.07);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1613; --surface:#15201C; --surface-2:#1E2C27; --ink:#E6EFEA; --muted:#93A59D; --line:#2A3B34;
+    --accent:#4FC3A8; --accent-ink:#06251D; --gold:#F2B01E; --gold-ink:#2B1F00;
+    --good:#5CCB8B; --warn:#E3A63A; --bad:#FF8A80;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.35);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1613; --surface:#15201C; --surface-2:#1E2C27; --ink:#E6EFEA; --muted:#93A59D; --line:#2A3B34;
+  --accent:#4FC3A8; --accent-ink:#06251D; --gold:#F2B01E; --gold-ink:#2B1F00;
+  --good:#5CCB8B; --warn:#E3A63A; --bad:#FF8A80;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.55;
+  padding-block:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:1080px;margin:0 auto;min-width:0}
+h1,h2,h3{font-family:var(--font-display);line-height:1.1;margin:0;text-wrap:balance;letter-spacing:-.015em}
+h1{font-weight:800;font-size:clamp(2.3rem,6vw,3.7rem);letter-spacing:-.03em}
+h2{font-weight:800;font-size:1.6rem}
+h3{font-weight:600;font-size:1.1rem}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:.86rem}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+.hdr{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 0}
+.hdr-in{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:800;font-size:1.3rem;letter-spacing:-.02em}
+.mark{width:26px;height:26px;border-radius:8px;background:var(--accent);position:relative;flex:none}
+.mark::after{content:"";position:absolute;width:8px;height:8px;border-radius:50%;background:var(--gold);right:5px;bottom:5px}
+.mark::before{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:var(--accent-ink);left:6px;top:6px;opacity:.9}
+.hdr-right{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;font-size:.84rem;color:var(--muted);max-width:100%}
+.chip b{color:var(--ink);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:16ch}
+
+/* buttons and fields */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:10px 18px;font-weight:600;cursor:pointer;text-decoration:none;line-height:1.2}
+.btn:hover{filter:brightness(1.07)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{background:var(--surface-2);filter:none}
+.btn.danger{background:transparent;color:var(--bad);border-color:var(--bad)}
+.btn.sm{padding:6px 12px;font-size:.86rem;border-radius:8px}
+.btn.block{width:100%}
+.link{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer;font-size:inherit}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label{font-size:.84rem;font-weight:600}
+.field input,.field select,.field textarea{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
+.field textarea{min-height:92px;resize:vertical}
+.field .hint{font-size:.8rem;color:var(--muted)}
+.form{display:flex;flex-direction:column;gap:14px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.row2>*{min-width:0}
+.phone-in{display:flex;gap:8px}
+.phone-in span{display:flex;align-items:center;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:0 12px;font-weight:600}
+
+/* panels */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:var(--shadow);min-width:0}
+.panel.flat{box-shadow:none}
+.stack{display:flex;flex-direction:column;gap:16px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:8px 12px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.note{font-size:.82rem;color:var(--muted);border-top:1px dashed var(--line);padding-top:12px;margin-top:16px}
+.demo{background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:.88rem}
+.demo b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.15em;font-size:1.05rem}
+.err{color:var(--bad);font-size:.86rem}
+
+/* hero */
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:start;padding-block:44px 28px}
+.hero>*{min-width:0}
+.eyebrow{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:14px}
+.eyebrow .ta{font-family:var(--font-tamil);letter-spacing:.02em;text-transform:none;font-size:.95rem}
+.lead{font-size:1.1rem;color:var(--muted);max-width:46ch;margin-top:18px}
+.facts{list-style:none;margin:26px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:10px}
+.facts li{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-weight:600;font-size:.9rem}
+.facts li em{font-style:normal;background:var(--gold);color:var(--gold-ink);border-radius:6px;padding:1px 7px;margin-right:4px}
+
+/* stepper */
+.steps{display:flex;flex-wrap:wrap;gap:8px 22px;list-style:none;margin:26px 0 0;padding:0;font-size:.86rem;color:var(--muted)}
+.steps li{display:flex;align-items:center;gap:8px}
+.steps i{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-style:normal;font-size:.74rem;font-weight:600}
+.steps li.on{color:var(--ink);font-weight:600}
+.steps li.on i{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.steps li.done i{border-color:var(--accent);color:var(--accent)}
+
+/* page blocks */
+.page{padding-block:30px 24px}
+.page-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:20px}
+.choice{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px}
+.choice>*{min-width:0}
+.choice .panel{display:flex;flex-direction:column;gap:12px}
+.plans{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0}
+.plans>*{min-width:0}
+.plan{text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;display:flex;flex-direction:column;gap:4px}
+.plan[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.plan .amt{font-family:var(--font-display);font-weight:800;font-size:2rem;letter-spacing:-.02em}
+.plan .amt small{font-size:.9rem;font-weight:600;color:var(--muted)}
+.pay{display:grid;grid-template-columns:200px 1fr;gap:24px;align-items:start}
+.pay>*{min-width:0}
+.qr{width:200px;height:200px;background:#fff;border-radius:12px;padding:12px;display:grid;place-items:center;overflow:hidden}
+.qr img,.qr canvas{max-width:100%;height:auto}
+.copyline{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.copyline code{background:var(--surface-2);border-radius:8px;padding:6px 10px;font-size:.95rem;overflow-wrap:anywhere}
+
+/* marketplace */
+.toolbar{display:flex;flex-direction:column;gap:12px;margin-bottom:18px}
+.search{max-width:420px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.cat{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 14px;font-size:.86rem;cursor:pointer}
+.cat[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px}
+.lc{display:flex;flex-direction:column;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer;padding:0;min-width:0}
+.lc:hover{box-shadow:var(--shadow)}
+.ph{display:block;aspect-ratio:4/3;background-color:var(--surface-2);position:relative;overflow:hidden;
+  background-image:radial-gradient(circle,var(--line) 2px,transparent 2.6px),radial-gradient(circle,var(--line) 2px,transparent 2.6px);
+  background-size:22px 22px;background-position:0 0,11px 11px}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph .cn{position:absolute;left:12px;bottom:10px;background:var(--surface);border-radius:8px;padding:2px 10px;font-size:.78rem;font-weight:600}
+.lc-body{display:flex;flex-direction:column;gap:6px;padding:12px 14px 14px}
+.lc-title{font-weight:600;overflow-wrap:anywhere}
+.price{align-self:flex-start;background:var(--gold);color:var(--gold-ink);font-family:var(--font-display);font-weight:800;font-size:1.15rem;border-radius:8px;padding:1px 10px}
+.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:1px 9px;font-size:.74rem;font-weight:600;color:var(--muted);background:var(--surface)}
+.pill.good{color:var(--good);border-color:var(--good)}
+.pill.warn{color:var(--warn);border-color:var(--warn)}
+.pill.bad{color:var(--bad);border-color:var(--bad)}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.empty{border:1px dashed var(--line);border-radius:14px;padding:28px;text-align:center;color:var(--muted)}
+.list{display:flex;flex-direction:column;gap:12px}
+.item{display:grid;grid-template-columns:72px 1fr auto;gap:14px;align-items:start;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px}
+.item>*{min-width:0}
+.item .th{width:72px;height:72px;border-radius:10px;overflow:hidden;background:var(--surface-2)}
+.item .th img{width:100%;height:100%;object-fit:cover}
+.item .act{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.reqs{grid-column:1/-1;border-top:1px dashed var(--line);padding-top:10px;font-size:.88rem}
+.prev{width:140px;aspect-ratio:4/3;border-radius:10px;overflow:hidden;background:var(--surface-2);display:none}
+.prev:not(:empty){display:block}
+.prev img{width:100%;height:100%;object-fit:cover}
+
+/* modal */
+.mb{position:fixed;inset:0;z-index:40;background:rgba(8,14,12,.6);display:grid;place-items:center;
+  padding:calc(16px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) calc(16px + env(safe-area-inset-left,0px))}
+.modal{background:var(--surface);border-radius:18px;max-width:520px;width:100%;max-height:100%;overflow:auto;border:1px solid var(--line)}
+.modal .ph{aspect-ratio:16/10}
+.modal-body{padding:20px;display:flex;flex-direction:column;gap:14px}
+
+/* admin */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:22px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.tile b{display:block;font-family:var(--font-display);font-size:1.8rem;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.tbl{width:100%;border-collapse:collapse;font-size:.88rem;min-width:560px}
+.tbl th{text-align:left;font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line)}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle;font-variant-numeric:tabular-nums}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .acts{display:flex;gap:6px;flex-wrap:nowrap}
+.check{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px;font-size:.9rem}
+h3.sec{margin:26px 0 10px}
+
+.ftr{border-top:1px solid var(--line);margin-top:40px;padding-block:20px calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between;font-size:.82rem;color:var(--muted)}
+#toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--ink);color:var(--bg);border-radius:10px;padding:10px 16px;font-size:.88rem;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;max-width:calc(100% - 32px)}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:820px){
+  .hero{grid-template-columns:1fr;gap:28px;padding-block:28px 16px}
+  .pay{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .row2,.choice,.plans{grid-template-columns:1fr}
+  .item{grid-template-columns:60px 1fr}
+  .item .th{width:60px;height:60px}
+  .item .act{grid-column:1/-1;justify-content:flex-start}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div id="app"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(function(){
+'use strict';
+var KEY='marupadi_v1', DAY=86400000;
+var CATS=['Phones & tablets','Laptops & computers','Home appliances','Furniture','Books & study','Vehicles & bikes','Fashion','Other'];
+var CONDS=['Like new','Good','Fair','Needs repair'];
+
+function uid(){return Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-3);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function inr(n){return '₹'+Number(n).toLocaleString('en-IN');}
+function fdate(t){return new Date(t).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});}
+function ftime(t){return new Date(t).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});}
+
+function defaults(){
+  var now=Date.now();
+  function mk(t,c,cond,p,city,d){return {id:uid(),sellerId:'sample',sellerName:'Sample seller',contact:'',title:t,cat:c,cond:cond,price:p,city:city,desc:d,photo:'',status:'live',sample:true,createdAt:now};}
+  return {
+    users:[],session:null,subs:[],orders:[],
+    listings:[
+      mk('Redmi Note 10 Pro, 6GB/128GB','Phones & tablets','Good',8500,'T. Nagar, Chennai','Two years old, battery lasts a full day. Box, charger and a screen guard included.'),
+      mk('Lenovo ThinkPad T480, i5, 8GB','Laptops & computers','Good',19000,'Velachery, Chennai','256GB SSD, new keyboard fitted last year. Light scratches on the lid.'),
+      mk('Godrej 190L single-door fridge','Home appliances','Fair',6200,'Anna Nagar, Chennai','Cools well, runs quietly. Moving to a smaller flat, so selling.'),
+      mk('Teak study table with drawer','Furniture','Good',3800,'Adyar, Chennai','4 ft table, solid teak, one lockable drawer. Pickup only.'),
+      mk('TVS Jupiter 2017, 38,000 km','Vehicles & bikes','Good',34000,'Tambaram, Chennai','Second owner, papers clear, insurance valid. Serviced in September.'),
+      mk('Class 12 PCM textbook set','Books & study','Like new',600,'Mylapore, Chennai','Physics, Chemistry and Maths, both volumes. No markings.')
+    ],
+    settings:{brand:'Twice',upiId:'9176683102@fam',monthly:50,yearly:150,pinHash:''}
+  };
+}
+function load(){
+  try{
+    var r=localStorage.getItem(KEY);
+    if(r){var p=JSON.parse(r),d=defaults();
+      p.settings=Object.assign(d.settings,p.settings||{});
+      ['users','subs','orders','listings'].forEach(function(k){if(!Array.isArray(p[k]))p[k]=d[k];});
+      if(!('session' in p))p.session=null;
+      return p;}
+  }catch(e){}
+  return defaults();
+}
+var db=load();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(db));return true;}catch(e){return false;}}
+
+var ui={authTab:'google',otp:null,otpPhone:'',otpName:'',plan:'yearly',payTab:'upi',tab:'',q:'',cat:'All',modal:null,
+  adminOpen:false,adminAuthed:false,adminTab:'overview',confirmId:null,confirmReset:false,photo:''};
+
+var app=document.getElementById('app'), toastEl=document.getElementById('toast'), tt=null;
+function toast(m){toastEl.textContent=m;toastEl.classList.add('on');clearTimeout(tt);tt=setTimeout(function(){toastEl.classList.remove('on');},2800);}
+
+/* ---------- data helpers ---------- */
+function me(){return db.users.find(function(u){return u.id===db.session;});}
+function userById(id){return db.users.find(function(u){return u.id===id;});}
+function activeSub(id){
+  return db.subs.filter(function(s){return s.userId===id&&s.status==='active'&&s.endAt>Date.now();}).sort(function(a,b){return b.endAt-a.endAt;})[0];
+}
+function pendingSub(id){return db.subs.find(function(s){return s.userId===id&&s.status==='pending';});}
+function lastSub(id){return db.subs.filter(function(s){return s.userId===id;}).sort(function(a,b){return b.requestedAt-a.requestedAt;})[0];}
+function planAmt(k){return k==='yearly'?db.settings.yearly:db.settings.monthly;}
+function contactOf(u){return u?(u.phone?'+91 '+u.phone:u.email):'';}
+
+/* ---------- shell ---------- */
+function stepper(n){
+  var names=['Sign in','Choose role','Subscribe','Start'];
+  return '<ol class="steps" aria-label="Steps">'+names.map(function(t,i){
+    var c=i<n?'done':(i===n?'on':'');
+    return '<li class="'+c+'"><i>'+(i<n?'✓':i+1)+'</i>'+t+'</li>';}).join('')+'</ol>';
+}
+function shell(inner){
+  var u=me(), right='';
+  if(ui.adminOpen){
+    right='<span class="chip"><b>Owner area</b></span>'+(ui.adminAuthed?'<button class="btn ghost sm" data-act="lock">Lock</button>':'')+'<button class="btn ghost sm" data-act="closeAdmin">Back to site</button>';
+  }else if(u){
+    var sub=activeSub(u.id);
+    right='<span class="chip"><b>'+esc(u.name||contactOf(u))+'</b></span>';
+    if(sub&&u.role){
+      right+='<span class="chip">Active till <b>'+fdate(sub.endAt)+'</b></span>'+
+        '<button class="btn ghost sm" data-act="switchRole">Switch to '+(u.role==='buyer'?'seller':'buyer')+'</button>';
+    }
+    right+='<button class="btn ghost sm" data-act="signOut">Sign out</button>';
+  }
+  return '<div class="wrap"><header class="hdr"><div class="hdr-in"><div class="brand"><span class="mark"></span>'+esc(db.settings.brand)+'</div><div class="hdr-right">'+right+'</div></div></header>'+
+    inner+
+    '<footer class="ftr"><span>© '+new Date().getFullYear()+' '+esc(db.settings.brand)+' · Preview build: sign-in and OTP are simulated</span><button class="link" data-act="openAdmin">Owner login</button></footer></div>'+
+    (ui.modal&&u?modalHtml(u):'');
+}
+
+/* ---------- views ---------- */
+function view(){
+  if(ui.adminOpen)return shell(adminView());
+  var u=me();
+  if(!u)return shell(authView());
+  if(!u.role)return shell(roleView());
+  if(!activeSub(u.id))return shell(payView(u));
+  return shell(u.role==='buyer'?buyerView(u):sellerView(u));
+}
+
+function authView(){
+  var s=db.settings, g=ui.authTab==='google', form='';
+  if(g){
+    form='<form class="form" data-form="google" novalidate>'+
+      '<div class="field"><label for="g-name">Your name</label><input id="g-name" name="uname" autocomplete="name" placeholder="e.g. Karthik R"></div>'+
+      '<div class="field"><label for="g-email">Google account email</label><input id="g-email" name="email" type="email" autocomplete="email" placeholder="you@gmail.com"></div>'+
+      '<button class="btn block" type="submit">Continue with Google</button></form>';
+  }else if(!ui.otp){
+    form='<form class="form" data-form="phone" novalidate>'+
+      '<div class="field"><label for="m-name">Your name</label><input id="m-name" name="uname" autocomplete="name" placeholder="e.g. Priya S"></div>'+
+      '<div class="field"><label for="m-phone">Mobile number</label><div class="phone-in"><span>+91</span><input id="m-phone" name="phone" inputmode="numeric" maxlength="10" autocomplete="tel-national" placeholder="10-digit number"></div></div>'+
+      '<button class="btn block" type="submit">Send OTP</button></form>';
+  }else{
+    form='<form class="form" data-form="otp" novalidate>'+
+      '<p>Enter the 6-digit code for <b>+91 '+esc(ui.otpPhone)+'</b>.</p>'+
+      '<div class="demo">Preview build: no SMS is sent. Your code is <b>'+esc(ui.otp)+'</b></div>'+
+      '<div class="field"><label for="m-otp">OTP</label><input id="m-otp" name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 digits"></div>'+
+      '<button class="btn block" type="submit">Verify and continue</button>'+
+      '<button class="link" type="button" data-act="changeNumber">Use a different number</button></form>';
+  }
+  return '<section class="hero"><div><p class="eyebrow"><span class="ta">மறுபடி</span> · once again</p>'+
+    '<h1>Used things, once again.</h1>'+
+    '<p class="lead">Buy and sell second-hand phones, laptops, furniture, books and bikes with people in your city.</p>'+
+    '<ul class="facts"><li><em>'+inr(s.monthly)+'</em>a month</li><li><em>'+inr(s.yearly)+'</em>a year</li><li>Pay with any UPI app</li></ul>'+
+    stepper(0)+'</div>'+
+    '<div class="panel"><h2 style="margin-bottom:14px">Sign in</h2>'+
+    '<div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="'+g+'" data-act="authTab" data-v="google">Google account</button>'+
+    '<button class="tab" role="tab" aria-selected="'+(!g)+'" data-act="authTab" data-v="mobile">Mobile number</button></div>'+
+    form+'<p class="note">Preview build: Google sign-in and OTP are simulated on this page until it is connected to a server.</p></div></section>';
+}
+
+function roleView(){
+  var u=me();
+  return '<section class="page"><h2>Welcome, '+esc((u.name||'friend').split(' ')[0])+'</h2>'+
+    '<p class="muted" style="margin-top:8px">How do you want to use '+esc(db.settings.brand)+'? You can switch later from the top bar.</p>'+
+    stepper(1)+
+    '<div class="choice">'+
+    '<div class="panel"><h3>I want to buy</h3><p class="muted">Browse items near you, send a request and get the seller’s contact number.</p><button class="btn" data-act="setRole" data-v="buyer">Become a buyer</button></div>'+
+    '<div class="panel"><h3>I want to sell</h3><p class="muted">List what you no longer use, with a photo and your price, and hear from buyers directly.</p><button class="btn" data-act="setRole" data-v="seller">Become a seller</button></div>'+
+    '</div></section>';
+}
+
+function upiLink(){
+  var s=db.settings;
+  return 'upi://pay?pa='+s.upiId+'&pn='+encodeURIComponent(s.brand)+'&am='+planAmt(ui.plan)+'&cu=INR&tn='+encodeURIComponent(s.brand+' '+ui.plan+' plan');
+}
+
+function payView(u){
+  var s=db.settings, pend=pendingSub(u.id), body='', notice='';
+  var last=lastSub(u.id);
+  if(!pend&&last&&last.status==='rejected')notice='<p class="err" style="margin-bottom:12px">We could not match your last payment (ID '+esc(last.utr)+'). Check the transaction ID and submit it again.</p>';
+  else if(!pend&&last&&last.status==='active')notice='<p class="muted" style="margin-bottom:12px">Your plan ended on '+fdate(last.endAt)+'. Pick a plan to continue.</p>';
+
+  if(pend){
+    body='<div class="panel"><h2>Payment received for checking</h2>'+
+      '<p class="muted" style="margin:10px 0 16px">We have your '+esc(pend.plan)+' plan payment of <b>'+inr(pend.amount)+'</b> (transaction ID '+esc(pend.utr)+', sent '+ftime(pend.requestedAt)+'). You can '+(u.role==='seller'?'sell':'buy')+' as soon as it is confirmed. Check back shortly.</p>'+
+      '<div class="meta"><button class="btn" data-act="refresh">Check status</button><button class="btn ghost" data-act="cancelPending">Cancel and pay again</button></div></div>';
+  }else{
+    var yr=s.monthly*12-s.yearly;
+    var plans='<div class="plans">'+
+      '<button class="plan" data-act="pickPlan" data-v="monthly" aria-pressed="'+(ui.plan==='monthly')+'"><b>Monthly</b><span class="amt">'+inr(s.monthly)+'<small> / month</small></span><span class="muted small">30 days of access</span></button>'+
+      '<button class="plan" data-act="pickPlan" data-v="yearly" aria-pressed="'+(ui.plan==='yearly')+'"><b>Yearly</b><span class="amt">'+inr(s.yearly)+'<small> / year</small></span><span class="muted small">365 days of access'+(yr>0?' · saves '+inr(yr):'')+'</span></button></div>';
+    var amt=planAmt(ui.plan), pay='';
+    if(ui.payTab==='upi'){
+      pay='<div class="pay"><div class="qr" id="qr"></div><div class="stack" style="gap:12px">'+
+        '<p>Pay exactly <b>'+inr(amt)+'</b> to this UPI ID from GPay, PhonePe, Paytm, BHIM or any UPI app.</p>'+
+        '<div class="copyline"><code>'+esc(s.upiId)+'</code><button class="btn ghost sm" data-act="copy" data-v="'+esc(s.upiId)+'">Copy UPI ID</button></div>'+
+        '<a class="btn ghost sm" style="align-self:flex-start" href="'+esc(upiLink())+'">Open in UPI app</a>'+
+        '<p class="muted small">On a phone the button opens your UPI app. If nothing happens, scan the QR or copy the ID.</p></div></div>'+
+        '<form class="form" data-form="utr" style="margin-top:20px" novalidate>'+
+        '<div class="field"><label for="u-utr">UPI transaction ID (12 digits)</label><input id="u-utr" name="utr" inputmode="numeric" maxlength="12" placeholder="e.g. 412345678901"><span class="hint">Find it in your payment app under transaction details, sometimes called UTR or reference number.</span></div>'+
+        '<button class="btn" type="submit">I’ve paid '+inr(amt)+'</button></form>';
+    }else{
+      pay='<div class="empty"><b>Card payments are not switched on yet</b><p style="margin-top:6px">Debit and credit card payments open once the owner connects a payment gateway. Please pay by UPI for now.</p></div>';
+    }
+    body=plans+'<div class="panel flat"><div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="'+(ui.payTab==='upi')+'" data-act="payTab" data-v="upi">UPI</button><button class="tab" role="tab" aria-selected="'+(ui.payTab==='card')+'" data-act="payTab" data-v="card">Debit / credit card</button></div>'+pay+'</div>';
+  }
+  return '<section class="page"><h2>Subscribe to '+(u.role==='seller'?'sell':'buy')+' on '+esc(s.brand)+'</h2>'+
+    '<p class="muted" style="margin-top:8px">One subscription covers both buying and selling.</p>'+stepper(2)+'<div style="margin-top:22px">'+notice+body+'</div></section>';
+}
+
+/* ----- buyer ----- */
+function cardHtml(l){
+  return '<button class="lc" data-act="open" data-id="'+l.id+'"><span class="ph">'+(l.photo?'<img alt="" src="'+l.photo+'">':'')+'<span class="cn">'+esc(l.cat)+'</span></span>'+
+    '<span class="lc-body"><span class="lc-title">'+esc(l.title)+'</span><span class="price">'+inr(l.price)+'</span>'+
+    '<span class="meta"><span class="pill">'+esc(l.cond)+'</span>'+(l.sample?'<span class="pill">Sample</span>':'')+'<span class="muted small">'+esc(l.city)+'</span></span></span></button>';
+}
+function gridHtml(){
+  var q=ui.q.trim().toLowerCase();
+  var rows=db.listings.filter(function(l){
+    if(l.status!=='live')return false;
+    if(ui.cat!=='All'&&l.cat!==ui.cat)return false;
+    if(q&&(l.title+' '+l.desc+' '+l.city+' '+l.cat).toLowerCase().indexOf(q)<0)return false;
+    return true;
+  }).sort(function(a,b){return b.createdAt-a.createdAt;});
+  if(!rows.length)return '<div class="empty">No items match. Try another word or category.</div>';
+  return '<div class="grid">'+rows.map(cardHtml).join('')+'</div>';
+}
+function buyerView(u){
+  var t=ui.tab==='requests'?'requests':'browse', c='';
+  if(t==='browse'){
+    c='<div class="toolbar"><div class="field search"><label for="q">Search</label><input id="q" type="search" placeholder="Phone, table, bike…" value="'+esc(ui.q)+'"></div>'+
+      '<div class="chips">'+['All'].concat(CATS).map(function(k){return '<button class="cat" data-act="cat" data-v="'+esc(k)+'" aria-pressed="'+(ui.cat===k)+'">'+esc(k)+'</button>';}).join('')+'</div></div>'+
+      '<div id="grid">'+gridHtml()+'</div>';
+  }else{
+    var mine=db.orders.filter(function(o){return o.buyerId===u.id;}).sort(function(a,b){return b.createdAt-a.createdAt;});
+    c=mine.length?'<div class="list">'+mine.map(function(o){
+      var l=db.listings.find(function(x){return x.id===o.listingId;});
+      if(!l)return '<div class="item" style="grid-template-columns:1fr"><span class="muted">This listing was removed.</span></div>';
+      return '<div class="item"><div class="th">'+(l.photo?'<img alt="" src="'+l.photo+'">':'')+'</div><div><b>'+esc(l.title)+'</b><div class="meta" style="margin-top:4px"><span class="price">'+inr(l.price)+'</span>'+(l.status==='sold'?'<span class="pill bad">Sold</span>':'<span class="pill good">Requested</span>')+'</div>'+
+        '<p class="small muted" style="margin-top:6px">'+esc(l.city)+' · Seller contact: <b style="color:var(--ink)">'+esc(l.contact||'Sample listing')+'</b></p></div><div></div></div>';
+    }).join('')+'</div>':'<div class="empty">You have not requested anything yet. Open an item and choose “Request to buy”.</div>';
+  }
+  return '<section class="page"><div class="page-head"><h2>'+(t==='browse'?'Find something':'My requests')+'</h2></div>'+
+    '<div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="'+(t==='browse')+'" data-act="tab" data-v="browse">Browse</button><button class="tab" role="tab" aria-selected="'+(t==='requests')+'" data-act="tab" data-v="requests">My requests</button></div>'+c+'</section>';
+}
+function modalHtml(u){
+  var l=db.listings.find(function(x){return x.id===ui.modal;});
+  if(!l)return '';
+  var own=l.sellerId===u.id, ord=db.orders.find(function(o){return o.listingId===l.id&&o.buyerId===u.id;}), act='';
+  if(l.sample)act='<p class="muted small">This is a sample listing for preview, so it cannot be requested.</p>';
+  else if(own)act='<p class="muted small">This is your listing.</p>';
+  else if(l.status==='sold')act='<p><span class="pill bad">Sold</span></p>';
+  else if(u.role!=='buyer')act='<p class="muted small">Switch to buyer from the top bar to request this item.</p>';
+  else if(ord)act='<div class="demo">Seller contact: <b style="letter-spacing:0;font-family:inherit">'+esc(l.contact)+'</b></div><p class="muted small">Call or message the seller, meet in a public place and pay the seller directly. '+esc(db.settings.brand)+' does not hold the money.</p>';
+  else act='<button class="btn" data-act="request" data-id="'+l.id+'">Request to buy</button>';
+  return '<div class="mb" data-act="closeModal" data-bg="1"><div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(l.title)+'"><span class="ph">'+(l.photo?'<img alt="" src="'+l.photo+'">':'')+'<span class="cn">'+esc(l.cat)+'</span></span>'+
+    '<div class="modal-body"><h3 style="font-size:1.4rem">'+esc(l.title)+'</h3><div class="meta"><span class="price">'+inr(l.price)+'</span><span class="pill">'+esc(l.cond)+'</span><span class="muted small">'+esc(l.city)+'</span></div>'+
+    '<p>'+esc(l.desc||'No description added.')+'</p><p class="muted small">Listed by '+esc(l.sellerName)+' on '+fdate(l.createdAt)+'</p>'+act+
+    '<button class="btn ghost" data-act="closeModal">Close</button></div></div></div>';
+}
+
+/* ----- seller ----- */
+function sellerView(u){
+  var t=ui.tab==='mine'?'mine':'new', c='';
+  if(t==='new'){
+    c='<form class="panel form" data-form="listing" novalidate>'+
+      '<div class="field"><label for="l-title">Item name</label><input id="l-title" name="title" maxlength="80" placeholder="e.g. Samsung 43” smart TV"></div>'+
+      '<div class="row2"><div class="field"><label for="l-cat">Category</label><select id="l-cat" name="cat">'+CATS.map(function(k){return '<option>'+esc(k)+'</option>';}).join('')+'</select></div>'+
+      '<div class="field"><label for="l-cond">Condition</label><select id="l-cond" name="cond">'+CONDS.map(function(k){return '<option>'+esc(k)+'</option>';}).join('')+'</select></div></div>'+
+      '<div class="row2"><div class="field"><label for="l-price">Price (₹)</label><input id="l-price" name="price" inputmode="numeric" placeholder="e.g. 12000"></div>'+
+      '<div class="field"><label for="l-city">Area and city</label><input id="l-city" name="city" maxlength="60" placeholder="e.g. Porur, Chennai"></div></div>'+
+      '<div class="field"><label for="l-contact">Contact number for buyers</label><input id="l-contact" name="contact" inputmode="numeric" maxlength="10" value="'+esc(u.phone||'')+'" placeholder="10-digit mobile"><span class="hint">Shown only to buyers who send a request.</span></div>'+
+      '<div class="field"><label for="l-desc">Description</label><textarea id="l-desc" name="desc" maxlength="500" placeholder="Age, what is included, any faults"></textarea></div>'+
+      '<div class="field"><label for="photo">Photo</label><input id="photo" type="file" accept="image/*"><div class="prev" id="photoPrev"></div></div>'+
+      '<button class="btn" type="submit">Publish listing</button></form>';
+  }else{
+    var mine=db.listings.filter(function(l){return l.sellerId===u.id;}).sort(function(a,b){return b.createdAt-a.createdAt;});
+    c=mine.length?'<div class="list">'+mine.map(function(l){
+      var reqs=db.orders.filter(function(o){return o.listingId===l.id;});
+      var rh=reqs.length?'<div class="reqs"><b>'+reqs.length+' request'+(reqs.length>1?'s':'')+'</b>'+reqs.map(function(o){var b=userById(o.buyerId);return '<div>'+esc(b?b.name:'Buyer')+' · '+esc(contactOf(b))+' · '+ftime(o.createdAt)+'</div>';}).join('')+'</div>':'';
+      var del=ui.confirmId===l.id?'<button class="btn danger sm" data-act="delYes" data-id="'+l.id+'">Confirm delete</button><button class="btn ghost sm" data-act="delNo">Keep</button>':'<button class="btn ghost sm" data-act="delAsk" data-id="'+l.id+'">Delete</button>';
+      return '<div class="item"><div class="th">'+(l.photo?'<img alt="" src="'+l.photo+'">':'')+'</div><div><b>'+esc(l.title)+'</b><div class="meta" style="margin-top:4px"><span class="price">'+inr(l.price)+'</span>'+(l.status==='sold'?'<span class="pill bad">Sold</span>':'<span class="pill good">Live</span>')+'</div></div>'+
+        '<div class="act"><button class="btn ghost sm" data-act="toggleSold" data-id="'+l.id+'">'+(l.status==='sold'?'Relist':'Mark sold')+'</button>'+del+'</div>'+rh+'</div>';
+    }).join('')+'</div>':'<div class="empty">You have no listings yet. Use “List an item” to add your first.</div>';
+  }
+  return '<section class="page"><div class="page-head"><h2>'+(t==='new'?'List an item':'My listings')+'</h2></div>'+
+    '<div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="'+(t==='new')+'" data-act="tab" data-v="new">List an item</button><button class="tab" role="tab" aria-selected="'+(t==='mine')+'" data-act="tab" data-v="mine">My listings</button></div>'+c+'</section>';
+}
+
+/* ----- admin ----- */
+function adminView(){
+  var s=db.settings;
+  if(!ui.adminAuthed){
+    var first=!s.pinHash;
+    return '<section class="page" style="max-width:440px"><h2>'+(first?'Set your owner PIN':'Owner login')+'</h2>'+
+      '<p class="muted" style="margin:8px 0 18px">'+(first?'This PIN protects payments, members and settings. Choose one only you know.':'Enter your PIN to manage payments, members and settings.')+'</p>'+
+      '<form class="panel form" data-form="adminpin" novalidate><div class="field"><label for="a-pin">'+(first?'New PIN (6+ characters)':'PIN')+'</label><input id="a-pin" name="pin" type="password" autocomplete="'+(first?'new-password':'current-password')+'"></div>'+
+      (first?'<div class="field"><label for="a-pin2">Repeat PIN</label><input id="a-pin2" name="pin2" type="password" autocomplete="new-password"></div>':'')+
+      '<button class="btn" type="submit">'+(first?'Save PIN':'Unlock')+'</button></form></section>';
+  }
+  var pend=db.subs.filter(function(x){return x.status==='pending';});
+  var total=db.subs.filter(function(x){return x.status==='active';}).reduce(function(a,x){return a+x.amount;},0);
+  var members=db.users.filter(function(x){return activeSub(x.id);}).length;
+  var live=db.listings.filter(function(x){return x.status==='live';}).length;
+  var T=[['overview','Overview'],['payments','Payments'+(pend.length?' ('+pend.length+')':'')],['members','Members'],['listings','Listings'],['settings','Settings']];
+  var tabs='<div class="tabs" role="tablist">'+T.map(function(t){return '<button class="tab" role="tab" aria-selected="'+(ui.adminTab===t[0])+'" data-act="adminTab" data-v="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
+  var c='';
+  if(ui.adminTab==='overview'){
+    c='<div class="tiles"><div class="tile"><b>'+pend.length+'</b><span class="muted small">Payments to confirm</span></div><div class="tile"><b>'+members+'</b><span class="muted small">Active members</span></div><div class="tile"><b>'+live+'</b><span class="muted small">Live listings</span></div><div class="tile"><b>'+inr(total)+'</b><span class="muted small">Approved so far</span></div></div>'+
+      '<p class="muted">Payments arrive in your UPI account <b style="color:var(--ink)">'+esc(s.upiId)+'</b>. Match each transaction ID against your bank or UPI app history, then approve it in the Payments tab.</p>';
+  }else if(ui.adminTab==='payments'){
+    var hist=db.subs.filter(function(x){return x.status!=='pending';}).sort(function(a,b){return b.requestedAt-a.requestedAt;});
+    function row(x,acts){var u=userById(x.userId);return '<tr><td>'+ftime(x.requestedAt)+'</td><td>'+esc(u?u.name:'?')+'<div class="muted small">'+esc(contactOf(u))+'</div></td><td>'+esc(x.plan)+'</td><td>'+inr(x.amount)+'</td><td><code>'+esc(x.utr)+'</code></td><td>'+acts+'</td></tr>';}
+    c='<h3 class="sec" style="margin-top:0">To confirm</h3>'+(pend.length?'<div class="scroll"><table class="tbl"><thead><tr><th>Sent</th><th>Member</th><th>Plan</th><th>Amount</th><th>Transaction ID</th><th></th></tr></thead><tbody>'+
+      pend.map(function(x){return row(x,'<div class="acts"><button class="btn sm" data-act="approve" data-id="'+x.id+'">Approve</button><button class="btn danger sm" data-act="reject" data-id="'+x.id+'">Reject</button></div>');}).join('')+'</tbody></table></div>':'<div class="empty">Nothing waiting.</div>')+
+      '<h3 class="sec">History</h3>'+(hist.length?'<div class="scroll"><table class="tbl"><thead><tr><th>Sent</th><th>Member</th><th>Plan</th><th>Amount</th><th>Transaction ID</th><th>Result</th></tr></thead><tbody>'+
+      hist.map(function(x){return row(x,x.status==='active'?'<span class="pill good">Approved till '+fdate(x.endAt)+'</span>':'<span class="pill bad">Rejected</span>');}).join('')+'</tbody></table></div>':'<div class="empty">No decisions yet.</div>');
+  }else if(ui.adminTab==='members'){
+    c=db.users.length?'<div class="scroll"><table class="tbl"><thead><tr><th>Name</th><th>Contact</th><th>Signed in with</th><th>Role</th><th>Plan</th></tr></thead><tbody>'+
+      db.users.map(function(x){var a=activeSub(x.id);return '<tr><td>'+esc(x.name)+'</td><td>'+esc(contactOf(x))+'</td><td>'+(x.via==='google'?'Google':'Mobile')+'</td><td>'+esc(x.role||'Not chosen')+'</td><td>'+(a?'<span class="pill good">Till '+fdate(a.endAt)+'</span>':'<span class="pill">None</span>')+'</td></tr>';}).join('')+'</tbody></table></div>':'<div class="empty">No one has signed up yet.</div>';
+  }else if(ui.adminTab==='listings'){
+    c='<div class="scroll"><table class="tbl"><thead><tr><th>Item</th><th>Seller</th><th>Price</th><th>Status</th><th></th></tr></thead><tbody>'+
+      db.listings.map(function(l){return '<tr><td>'+esc(l.title)+(l.sample?' <span class="pill">Sample</span>':'')+'</td><td>'+esc(l.sellerName)+'</td><td>'+inr(l.price)+'</td><td>'+esc(l.status)+'</td><td><button class="btn danger sm" data-act="adminDel" data-id="'+l.id+'">Remove</button></td></tr>';}).join('')+'</tbody></table></div>'+(db.listings.length?'':'<div class="empty" style="margin-top:12px">No listings.</div>');
+  }else{
+    c='<form class="panel form" data-form="settings" novalidate><h3>Business settings</h3>'+
+      '<div class="row2"><div class="field"><label for="s-brand">Company name</label><input id="s-brand" name="brand" maxlength="24" value="'+esc(s.brand)+'"></div>'+
+      '<div class="field"><label for="s-upi">UPI ID for payments</label><input id="s-upi" name="upi" value="'+esc(s.upiId)+'"></div></div>'+
+      '<div class="row2"><div class="field"><label for="s-monthly">Monthly price (₹)</label><input id="s-monthly" name="monthly" inputmode="numeric" value="'+s.monthly+'"></div>'+
+      '<div class="field"><label for="s-yearly">Yearly price (₹)</label><input id="s-yearly" name="yearly" inputmode="numeric" value="'+s.yearly+'"></div></div>'+
+      '<button class="btn" type="submit" style="align-self:flex-start">Save settings</button></form>'+
+      '<form class="panel form" data-form="changepin" style="margin-top:18px" novalidate><h3>Change owner PIN</h3><div class="row2"><div class="field"><label for="s-pin">New PIN</label><input id="s-pin" name="pin" type="password" autocomplete="new-password"></div><div class="field"><label for="s-pin2">Repeat PIN</label><input id="s-pin2" name="pin2" type="password" autocomplete="new-password"></div></div><button class="btn ghost" type="submit" style="align-self:flex-start">Update PIN</button></form>'+
+      '<div class="panel" style="margin-top:18px"><h3 style="margin-bottom:10px">Before real customers use this</h3><ul class="check">'+
+      '<li>Host it on your own domain with a server and database. Right now each browser keeps its own data, so members, listings and payments are not shared between devices.</li>'+
+      '<li>Connect real Google sign-in (a Google Cloud OAuth client ID) and an SMS OTP service. Both are simulated here.</li>'+
+      '<li>Add a payment gateway such as Razorpay or Cashfree to take cards and confirm UPI payments automatically. Direct UPI to a personal ID cannot be verified by a website, so approvals are manual for now.</li>'+
+      '<li>Make the owner login server-side. The PIN here only protects this browser.</li></ul></div>'+
+      '<div class="panel" style="margin-top:18px"><h3 style="margin-bottom:10px">Reset preview data</h3><p class="muted small" style="margin-bottom:12px">Clears members, payments, requests and listings in this browser and restores the sample items.</p>'+
+      (ui.confirmReset?'<button class="btn danger sm" data-act="resetYes">Yes, reset everything</button> <button class="btn ghost sm" data-act="resetNo">Cancel</button>':'<button class="btn danger sm" data-act="resetAsk">Reset data</button>')+'</div>';
+  }
+  return '<section class="page"><div class="page-head"><h2>Owner area</h2></div>'+tabs+c+'</section>';
+}
+
+/* ---------- render ---------- */
+function makeQR(){
+  var box=document.getElementById('qr'); if(!box)return;
+  box.innerHTML='';
+  if(typeof QRCode==='undefined'){box.innerHTML='<span class="small" style="color:#444;text-align:center">QR unavailable. Use the UPI ID.</span>';return;}
+  try{new QRCode(box,{text:upiLink(),width:172,height:172,correctLevel:QRCode.CorrectLevel.M});}
+  catch(e){box.innerHTML='<span class="small" style="color:#444">QR unavailable.</span>';}
+}
+function render(){app.innerHTML=view();makeQR();}
+function saveRender(){if(!save())toast('Could not save in this browser. Storage may be full or blocked.');render();}
+
+/* ---------- actions ---------- */
+function signIn(o){
+  var u=db.users.find(function(x){return (o.email&&x.email===o.email)||(o.phone&&x.phone===o.phone);});
+  if(!u){u={id:uid(),name:o.name,email:o.email||'',phone:o.phone||'',via:o.via,role:'',createdAt:Date.now()};db.users.push(u);}
+  else if(o.name&&!u.name)u.name=o.name;
+  db.session=u.id;ui.otp=null;ui.tab=u.role==='seller'?'new':'browse';ui.modal=null;
+  saveRender();
+}
+var A={
+  authTab:function(el){ui.authTab=el.dataset.v;ui.otp=null;render();},
+  changeNumber:function(){ui.otp=null;render();},
+  setRole:function(el){var u=me();u.role=el.dataset.v;ui.tab=u.role==='seller'?'new':'browse';saveRender();},
+  switchRole:function(){var u=me();u.role=u.role==='buyer'?'seller':'buyer';ui.tab=u.role==='seller'?'new':'browse';ui.modal=null;saveRender();},
+  signOut:function(){db.session=null;ui.modal=null;ui.otp=null;saveRender();},
+  pickPlan:function(el){ui.plan=el.dataset.v;render();},
+  payTab:function(el){ui.payTab=el.dataset.v;render();},
+  copy:function(el){
+    var v=el.dataset.v;
+    try{navigator.clipboard.writeText(v).then(function(){toast('Copied '+v);},function(){toast('Copy is not available here. Select the text and copy it.');});}
+    catch(e){toast('Copy is not available here. Select the text and copy it.');}
+  },
+  refresh:function(){render();toast('Status checked');},
+  cancelPending:function(){var u=me();db.subs=db.subs.filter(function(s){return !(s.userId===u.id&&s.status==='pending');});saveRender();},
+  tab:function(el){ui.tab=el.dataset.v;render();},
+  cat:function(el){ui.cat=el.dataset.v;render();},
+  open:function(el){ui.modal=el.dataset.id;render();},
+  closeModal:function(el,e){if(el.dataset.bg&&e.target!==el)return;ui.modal=null;render();},
+  request:function(el){
+    var u=me(),l=db.listings.find(function(x){return x.id===el.dataset.id;});
+    if(!l||l.sellerId===u.id)return;
+    if(!db.orders.some(function(o){return o.listingId===l.id&&o.buyerId===u.id;}))db.orders.push({id:uid(),listingId:l.id,buyerId:u.id,createdAt:Date.now(),status:'requested'});
+    saveRender();toast('Request sent. Seller contact shown below.');
+  },
+  toggleSold:function(el){var l=db.listings.find(function(x){return x.id===el.dataset.id;});if(l){l.status=l.status==='sold'?'live':'sold';saveRender();}},
+  delAsk:function(el){ui.confirmId=el.dataset.id;render();},
+  delNo:function(){ui.confirmId=null;render();},
+  delYes:function(el){db.listings=db.listings.filter(function(x){return x.id!==el.dataset.id;});ui.confirmId=null;saveRender();toast('Listing deleted');},
+  openAdmin:function(){ui.adminOpen=true;ui.modal=null;render();window.scrollTo(0,0);},
+  closeAdmin:function(){ui.adminOpen=false;ui.adminAuthed=false;render();},
+  lock:function(){ui.adminAuthed=false;render();},
+  adminTab:function(el){ui.adminTab=el.dataset.v;render();},
+  approve:function(el){
+    var s=db.subs.find(function(x){return x.id===el.dataset.id;});
+    if(!s||s.status!=='pending')return;
+    var cur=activeSub(s.userId),start=Math.max(Date.now(),cur?cur.endAt:0);
+    s.status='active';s.startAt=start;s.endAt=start+(s.plan==='yearly'?365:30)*DAY;s.decidedAt=Date.now();
+    saveRender();toast('Approved. Member can start now.');
+  },
+  reject:function(el){var s=db.subs.find(function(x){return x.id===el.dataset.id;});if(s&&s.status==='pending'){s.status='rejected';s.decidedAt=Date.now();saveRender();toast('Rejected');}},
+  adminDel:function(el){db.listings=db.listings.filter(function(x){return x.id!==el.dataset.id;});saveRender();toast('Listing removed');},
+  resetAsk:function(){ui.confirmReset=true;render();},
+  resetNo:function(){ui.confirmReset=false;render();},
+  resetYes:function(){var pin=db.settings.pinHash,set=db.settings;db=defaults();db.settings=Object.assign(db.settings,set);db.settings.pinHash=pin;ui.confirmReset=false;saveRender();toast('Preview data reset');}
+};
+document.addEventListener('click',function(e){
+  var el=e.target.closest('[data-act]');
+  if(!el)return;
+  var fn=A[el.dataset.act];
+  if(fn)fn(el,e);
+});
+
+function v(f,n){return f.elements[n]?String(f.elements[n].value).trim():'';}
+async function hashPin(p){
+  var s='marupadi|'+p;
+  try{var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');}
+  catch(e){var h=5381;for(var i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return 'f'+h;}
+}
+var F={
+  google:function(f){
+    var name=v(f,'uname'),email=v(f,'email').toLowerCase();
+    if(name.length<2){toast('Enter your name.');return;}
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){toast('Enter a valid email address.');return;}
+    signIn({via:'google',name:name,email:email});
+  },
+  phone:function(f){
+    var ph=v(f,'phone'),name=v(f,'uname');
+    if(!/^[6-9]\d{9}$/.test(ph)){toast('Enter a valid 10-digit mobile number.');return;}
+    ui.otp=String(Math.floor(100000+Math.random()*900000));ui.otpPhone=ph;ui.otpName=name||('Member '+ph.slice(-4));render();
+  },
+  otp:function(f){
+    if(v(f,'code')!==ui.otp){toast('That code does not match.');return;}
+    signIn({via:'mobile',name:ui.otpName,phone:ui.otpPhone});
+  },
+  utr:function(f){
+    var utr=v(f,'utr'),u=me();
+    if(!/^\d{12}$/.test(utr)){toast('The transaction ID has 12 digits.');return;}
+    if(db.subs.some(function(s){return s.utr===utr&&s.status!=='rejected';})){toast('This transaction ID was already submitted.');return;}
+    db.subs.push({id:uid(),userId:u.id,plan:ui.plan,amount:planAmt(ui.plan),utr:utr,status:'pending',requestedAt:Date.now()});
+    saveRender();
+  },
+  listing:function(f){
+    var u=me(),title=v(f,'title'),price=parseInt(v(f,'price'),10),city=v(f,'city'),contact=v(f,'contact');
+    if(title.length<3){toast('Add an item name.');return;}
+    if(!(price>0&&price<=10000000)){toast('Enter a price in rupees.');return;}
+    if(city.length<2){toast('Add your area and city.');return;}
+    if(!/^[6-9]\d{9}$/.test(contact)){toast('Enter a valid 10-digit contact number.');return;}
+    db.listings.unshift({id:uid(),sellerId:u.id,sellerName:u.name||'Seller',contact:contact,title:title,cat:v(f,'cat'),cond:v(f,'cond'),price:price,city:city,desc:v(f,'desc'),photo:ui.photo,status:'live',sample:false,createdAt:Date.now()});
+    ui.photo='';ui.tab='mine';
+    if(!save()){db.listings.shift();render();toast('Could not save. The photo may be too large; try without it.');return;}
+    render();toast('Listing published');
+  },
+  adminpin:async function(f){
+    var pin=v(f,'pin'),s=db.settings;
+    if(!s.pinHash){
+      if(pin.length<6){toast('Use at least 6 characters.');return;}
+      if(pin!==v(f,'pin2')){toast('The two PINs do not match.');return;}
+      s.pinHash=await hashPin(pin);ui.adminAuthed=true;saveRender();toast('Owner PIN saved');
+    }else{
+      var h=await hashPin(pin);
+      if(h===s.pinHash){ui.adminAuthed=true;render();}else toast('Wrong PIN.');
+    }
+  },
+  changepin:async function(f){
+    var pin=v(f,'pin');
+    if(pin.length<6){toast('Use at least 6 characters.');return;}
+    if(pin!==v(f,'pin2')){toast('The two PINs do not match.');return;}
+    db.settings.pinHash=await hashPin(pin);saveRender();toast('PIN updated');
+  },
+  settings:function(f){
+    var brand=v(f,'brand'),upi=v(f,'upi'),m=parseInt(v(f,'monthly'),10),y=parseInt(v(f,'yearly'),10);
+    if(brand.length<2){toast('Enter a company name.');return;}
+    if(!/^[\w.\-]{2,}@[A-Za-z]{2,}$/.test(upi)){toast('Enter a valid UPI ID, like name@bank.');return;}
+    if(!(m>0&&y>0)){toast('Enter both prices in rupees.');return;}
+    db.settings.brand=brand;db.settings.upiId=upi;db.settings.monthly=m;db.settings.yearly=y;
+    saveRender();toast('Settings saved');
+  }
+};
+document.addEventListener('submit',function(e){
+  var f=e.target.closest('form[data-form]');
+  if(!f)return;
+  e.preventDefault();
+  var fn=F[f.dataset.form];
+  if(fn)fn(f);
+});
+document.addEventListener('input',function(e){
+  var t=e.target;
+  if(t.id==='q'){ui.q=t.value;var g=document.getElementById('grid');if(g)g.innerHTML=gridHtml();}
+  else if(t.id==='u-utr'||t.id==='m-phone'||t.id==='m-otp'||t.id==='l-contact'||t.id==='l-price'){t.value=t.value.replace(/\D/g,'');}
+});
+document.addEventListener('change',function(e){
+  if(e.target.id!=='photo')return;
+  var f=e.target.files&&e.target.files[0];
+  if(!f)return;
+  if(!/^image\//.test(f.type)){toast('Choose an image file.');return;}
+  var r=new FileReader();
+  r.onload=function(){
+    var img=new Image();
+    img.onload=function(){
+      var sc=Math.min(1,640/Math.max(img.width,img.height)),c=document.createElement('canvas');
+      c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      ui.photo=c.toDataURL('image/jpeg',0.72);
+      var p=document.getElementById('photoPrev');
+      if(p)p.innerHTML='<img alt="Preview of your photo" src="'+ui.photo+'">';
+    };
+    img.onerror=function(){toast('That image could not be read.');};
+    img.src=r.result;
+  };
+  r.readAsDataURL(f);
+});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&ui.modal){ui.modal=null;render();}});
+
+render();
+})();
+</script>
+
+</body></html>
